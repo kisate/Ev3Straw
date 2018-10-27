@@ -19,7 +19,7 @@ class Client():
 
             for i in range(message_size):
                 part = s.recv(8)
-                message.append(int.from_bytes(part, byteorder='big'))
+                message.append(int.from_bytes(part, byteorder='big', signed=True))
 
             #print (message)
             
@@ -40,7 +40,7 @@ class Client():
         msg = len(args).to_bytes(1, byteorder='big')
 
         for a in args:
-            msg += (a).to_bytes(8, byteorder='big')
+            msg += (a).to_bytes(8, byteorder='big', signed = True)
 
         self.socket.send(msg)
 

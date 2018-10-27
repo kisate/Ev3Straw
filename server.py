@@ -1,4 +1,9 @@
 import socket, threading
+
+import sys
+
+sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+
 import cv2.cv2
 
 host = '192.168.1.4'
@@ -21,7 +26,7 @@ def reader():
 
         for i in range(message_size):
             part = conn.recv(8)
-            message.append(int.from_bytes(part, byteorder='big'))
+            message.append(int.from_bytes(part, byteorder='big', signed=True))
 
         print (message)
         if len(part) == 0 : break
@@ -41,7 +46,7 @@ def send(*args):
     msg = len(args).to_bytes(1, byteorder='big')
 
     for a in args:
-        msg += (int(a)).to_bytes(8, byteorder='big')
+        msg += (int(a)).to_bytes(8, byteorder='big', signed=True)
 
     conn.send(msg)
 
@@ -59,7 +64,7 @@ def draw_circle(event,x,y,flags,param):
         send(1, y, x, 3000)
     
 cv2.namedWindow('frame')    
-cv2.setMouseCallback('frame',draw_circle)
+cv2.setMouseCallback('frame', draw_circle)
 cap = cv2.VideoCapture(1)
 
 conn, addr = s.accept()
@@ -70,17 +75,21 @@ threading.Thread(target=reader, args=()).start()
 
 threading.Thread(target=inputer, args=()).start()
 
+count = 15
 
 while True:
         _, frame = cap.read()
 
         cv2.imshow('frame', frame)
 
-        if cv2.waitKey(1) == ord('q'):
+        key = cv2.waitKey(1)
+
+        if key == ord('q'):
             cv2.destroyAllWindows()
             break
-
-
+        if key == ord('a'):
+            cv2.imwrite('/home/forester/Documents/klubnikor/eval/{:03d}.png'.format(count), frame)
+            count+=1
 
 a = False
 

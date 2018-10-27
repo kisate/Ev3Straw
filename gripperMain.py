@@ -6,7 +6,7 @@ import time
 
 from math import acos, pi
 
-from ev3dev2.motor import LargeMotor, OUTPUT_A, SpeedPercent, MoveTank, OUTPUT_D
+from ev3dev2.motor import LargeMotor, OUTPUT_B, SpeedPercent, MoveTank, OUTPUT_D
 from ev3dev2.sensor import INPUT_2
 from ev3dev2.sensor.lego import TouchSensor
 
@@ -36,7 +36,7 @@ lrServo = 5
 
 lastMessage = []
 
-host = '192.168.1.3'
+host = '192.168.1.4'
 port = 51000 # random number
 
 # code goes here ---------------
@@ -44,7 +44,7 @@ port = 51000 # random number
 servo = smbus.SMBus(3) # input port 1 
 servo.write_i2c_block_data(0x01, 0x48, [0xAA]) # xAA - disable 10 second timeout / xFF - no servo control / x00 - 10 second timeout
 
-moving_motor = LargeMotor(OUTPUT_A)
+moving_motor = LargeMotor(OUTPUT_B)
 pump_motor = LargeMotor(OUTPUT_D) # Should be D
 
 touch = TouchSensor(INPUT_2)
@@ -212,10 +212,12 @@ def collect(x, y, pos):
     support_thread.stop()
 
 def calibrate():
-    moving_motor.on(SpeedPercent(80))
+    moving_motor.on(SpeedPercent(100))
     while not touch.is_pressed:
         time.sleep(0.003)
     moving_motor.stop()
+
+    moving_motor.position = 0
 
 class MessageHandler():
     def __init__(self):
@@ -240,7 +242,7 @@ def waitForCommand():
             print(message)
             messagehandler.state = 0
             
-            collect(message[1], message[2], -message[3])
+            collect(message[1], message[2], message[3])
         if (messagehandler.state == 2):
             message = messagehandler.message
             print(message)
@@ -253,20 +255,27 @@ def waitForCommand():
             print(message)
             messagehandler.state = 0
 
-            position = -moving_motor.position
-            if position > message[1]:
-                moving_motor.on(SpeedPercent(60))
-                while -moving_motor.position > message[1]:
-                    time.sleep(0.003)
-                moving_motor.stop()
-            elif position < message[1]:
-                moving_motor.on(SpeedPercent(-60))
-                while -moving_motor.position < message[1]:
-                    time.sleep(0.003)
-                moving_motor.stop()
-            
-calibrate()
+            target = message[1] - 50
 
+            position = moving_motor.position
+            if position < target:
+                moving_motor.on(SpeedPercent(100))
+                while moving_motor.position < target:
+                    time.sleep(0.001)
+                    #print(-moving_motor.position)
+                    client.send(1, moving_motor.position)
+                moving_motor.stop()
+            elif position > target:
+                moving_motor.on(SpeedPercent(-100))
+                while moving_motor.position > target:
+                    time.sleep(0.001)
+                    print(moving_motor.position)
+                    client.send(1, moving_motor.position)
+                moving_motor.stop()
+
+rotateServoOnDefault()
+
+calibrate()
 
 client.connect(messagehandler)
 

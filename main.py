@@ -1,12 +1,23 @@
-from cv2 import cv2 
+
+
+import sys
+
+#sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
+
+import cv2 
 import numpy as npy
 import socket 
-from time import sleep
+import time
 import threading
 import firebase_admin
 from firebase_admin import credentials
 from firebase_admin import db
 import pyimgur
+import struct
+
+imHeight = 480
+height = 17
+
 
 host = '192.168.1.4'
 port = 51000 # random number
@@ -18,7 +29,7 @@ changed_id = []
 changed_stats = []
 CLIENT_ID = "733b83d64f87370"
 
-endPos = 5000
+endPos = -5000
 
 first = -1
 
@@ -55,6 +66,9 @@ except Exception:
 
 s.bind(('', 51000))
 s.listen(5)
+
+def close():
+    exit()
 
 def initialize():
     cred = credentials.Certificate("serviceAccountKey.json")
@@ -98,7 +112,7 @@ def check(ref):
     #print(stats)
     isc = False
     while True:
-        new_stats.clear()
+        new_stats[:] = []
         ref = db.reference('/berrys')
         for i in range(1, size):
                 new_stats.append(ref.child(str(i)).child('status').get())
@@ -149,10 +163,12 @@ def deliver(i):
 
     berry = allberries[i]
 
-    send(1, berry['x'], berry['y'], berry['pos'])
+    send(1, berry['x'], berry['y'], berry['enc'])
 
     while delivering:
         time.sleep(0.003)
+
+    del q[0]
 
 def handleMessage(message):
     global pos, delivering
@@ -169,27 +185,34 @@ def reader():
 
         part = conn.recv(1)
         
-        message_size = int.from_bytes(part, byteorder='big')
+        message_size = struct.unpack('>b', part)[0]
+
+        print "{} {}".format(part, struct.unpack('>b', part))
 
         for i in range(message_size):
             part = conn.recv(8)
-            message.append(int.from_bytes(part, byteorder='big'))
+            
+            print "{} {}".format(part, struct.unpack('>q', part))
+            message.append(struct.unpack('>q', part)[0])
+            #message.append(int.from_bytes(part, byteorder='big', signed=True))
 
         handleMessage(message)
         if len(part) == 0 : break
 
 def send(*args):
         
-    msg = len(args).to_bytes(1, byteorder='big')
+    #msg = len(args).to_bytes(1, byteorder='big')
+    msg = struct.pack('>b', len(args))
 
     for a in args:
-        msg += (int(a)).to_bytes(8, byteorder='big')
+        #msg += (int(a)).to_bytes(8, byteorder='big', signed=True)
+        msg += struct.pack('>q', a)
 
     conn.send(msg)
 
 def draw_circle(event,x,y,flags,param):
     if event == cv2.EVENT_LBUTTONDBLCLK:
-        send(1, y, x, 3000)
+        send(1, y, x, -3000)
 
 conn, addr = s.accept()
 
@@ -199,7 +222,7 @@ threading.Thread(target=reader, args=()).start()
 
 send(3, endPos)
 
-while(pos < endPos):
+while(pos > endPos):
     # Capture frame-by-frame    
     ret, frame = cap.read()
     
@@ -242,7 +265,9 @@ while(pos < endPos):
                 lastid+=1
                 berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid})
 
-                allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]})
+                allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame})
+
+                #allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]})
                 #allberries.append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid, 'enc' : 311})
             else :
                 berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : b})
@@ -263,10 +288,14 @@ im = pyimgur.Imgur(CLIENT_ID)
 
 db.reference('/berrys').delete()
 for i, berry in enumerate(allberries):
-    cv2.imwrite( "./img{}.png".format(i), berry['frame'])
-    uploaded_image = im.upload_image("./img{}.png".format(i), title="Strawberry {}".format(i))
-    print(uploaded_image.link)
-    create_new(ref, berry['enc'], i+1, 100, 0, str(uploaded_image.link), int(berry['x']), berry['y']/imHeight*height)
+    cv2.imwrite( "../photos/img{}.png".format(i), berry['frame'])
+    # uploaded_image = im.upload_image("../photos/img{}.png".format(i), title="Strawberry {}".format(i))
+    
+    link = 'https://i.imgur.com/CQdaHBw.png'
+
+    # print(uploaded_image.link)
+    create_new(ref, -berry['enc'], i+1, 100, 0, str(link), int(berry['x']), berry['y']/imHeight*height)
+    # create_new(ref, -berry['enc'], i+1, 100, 0, str(uploaded_image.link), int(berry['x']), berry['y']/imHeight*height)
 
 thread1 = threading.Thread(target=check, args=(ref,))
 thread1.start()  
