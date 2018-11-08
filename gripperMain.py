@@ -6,7 +6,7 @@ import time
 
 from math import acos, pi
 
-from ev3dev2.motor import LargeMotor, OUTPUT_B, SpeedPercent, MoveTank, OUTPUT_D
+from ev3dev2.motor import LargeMotor, OUTPUT_B, SpeedPercent, MoveTank, OUTPUT_A, OUTPUT_C, MediumMotor
 from ev3dev2.sensor import INPUT_2
 from ev3dev2.sensor.lego import TouchSensor
 
@@ -17,19 +17,25 @@ servoAddresses = [0x42, 0x43, 0x44, 0x45, 0x46, 0x47]
 imWidth = 480
 imHeight = 640
 
-width = 17.3
-height = 23.3
+width = 19
+height = 26
 
 length = 19
 
-downAngle = 40
-upAngle = 5
+downAngle = 50
+upAngle = 10
 defaultAngle = 130
+defaultAngle2 = 50
+
+cameraEnc = 1800
 
 encToCm = 4.1/360
 
-deltaX = -3
-deltaY = -5
+deltaX1 = -2
+deltaY1 = -4
+
+deltaX2 = -2
+deltaY2 = -4
 
 udServo = 0
 lrServo = 5
@@ -37,15 +43,16 @@ lrServo = 5
 lastMessage = []
 
 host = '192.168.1.4'
-port = 51000 # random number
+port = 51002 # random number
 
 # code goes here ---------------
 
 servo = smbus.SMBus(3) # input port 1 
 servo.write_i2c_block_data(0x01, 0x48, [0xAA]) # xAA - disable 10 second timeout / xFF - no servo control / x00 - 10 second timeout
 
-moving_motor = LargeMotor(OUTPUT_B)
-pump_motor = LargeMotor(OUTPUT_D) # Should be D
+moving_motor = LargeMotor(OUTPUT_A)
+pump_motor = LargeMotor(OUTPUT_B)
+camera_motor = MediumMotor(OUTPUT_C)
 
 touch = TouchSensor(INPUT_2)
 
@@ -58,7 +65,7 @@ def getServoPos(channel_id):
 def setServoPos(channel_id, position):
     servo.write_i2c_block_data(0x01, servoAddresses[channel_id], [position % 256])
 
-def rotateServo(channel_id, position):
+def rotateServo(channel_id, position, step = 0.02):
 
     position %= 256
 
@@ -70,13 +77,13 @@ def rotateServo(channel_id, position):
         current = min(position, current + 2)
         setServoPos(channel_id, current)
 
-        time.sleep(0.01)
+        time.sleep(step)
 
     while (current > position):
         current = max(position, current - 2)
         setServoPos(channel_id, current)
 
-        time.sleep(0.01)
+        time.sleep(step)
 
 def rotateServoOnDefault() :
     rotateServo(lrServo, defaultAngle)
@@ -93,12 +100,12 @@ class SupportThread(Thread):
     
     def run(self) :           
         while not self.exit.is_set():
+            pump_motor.reset()
+            self.exit.wait(0.1)
             pump_motor.on(SpeedPercent(100))
-            self.exit.wait(0.4)
-            pump_motor.stop()
-            self.exit.wait(0.14)
+            self.exit.wait(0.25)
         
-        pump_motor.stop()
+        pump_motor.reset()
 
             
     def stop(self) :
@@ -107,35 +114,54 @@ class SupportThread(Thread):
 support_thread = SupportThread('support')
 
 def deliver():
-    target = -4000
+    target = -10000
 
-    rotateServoOnDefault()
+    rotateServo(lrServo, defaultAngle, 0.05)
+    rotateServo(udServo, upAngle - 10)
 
-    moving_motor.on(SpeedPercent(-60))
+    moving_motor.on(SpeedPercent(-100))
     
     while (moving_motor.position > target):
         client.send(1, -moving_motor.position)
 
     moving_motor.stop()
-    
+
     rotateServo(udServo, downAngle - 20)
+    
+    support_thread.stop()
+
+    pump_motor.on(SpeedPercent(-100))
+    time.sleep(10)
+    pump_motor.reset()
 
     client.send(2, 0)
 
-    support_thread.stop()
+    
 
 def pick():
 
     global support_thread
 
     pump_motor.on(SpeedPercent(-100))
-    time.sleep(1.3)
 
-    rotateServo(udServo, downAngle)
+    rotateServo(udServo, downAngle, 0.01)
 
     pump_motor.on(SpeedPercent(100))
 
-    time.sleep(1)
+    time.sleep(1.5)
+
+    pump_motor.reset()
+    time.sleep(0.1)
+
+    pump_motor.on(SpeedPercent(100))
+
+    time.sleep(0.1)
+
+    rotateServo(udServo, upAngle, 0.1)
+
+    pump_motor.reset()
+
+    time.sleep(0.4)
 
     support_thread = SupportThread('support')
     support_thread.start()
@@ -151,6 +177,7 @@ def getRotAngle(dy):
     return max (0, (int)(256*acos(sinA)/pi) - 30)
 
 def getToRotatingPosition(dx, dy):
+    print (dy)
     r = (length*length - dy*dy)**0.5
 
     if (r > dx) :
@@ -172,28 +199,36 @@ def getToRotatingPosition(dx, dy):
     
     moving_motor.stop()
 
-def collect(x, y, pos):
+def collect(x, y, pos, half):
     rotateServo(lrServo, defaultAngle)
+    rotateServo(udServo, upAngle)
     delta = moving_motor.position - pos
 
     if delta > 0 :
 
-        moving_motor.on(SpeedPercent(-80))
+        moving_motor.on(SpeedPercent(-100))
 
         while(moving_motor.position > pos):
             time.sleep(0.003)
 
     else : 
 
-        moving_motor.on(SpeedPercent(80))
+        moving_motor.on(SpeedPercent(100))
 
         while(moving_motor.position < pos):
             time.sleep(0.003)
     
     moving_motor.stop()
 
-    dx = (imWidth - x)/imWidth*width + deltaX
-    dy = y/imHeight*height + deltaY
+
+    if (half == 1):
+        dx = (imWidth - x)/imWidth*width + deltaX1
+        dy = y/imHeight*height + deltaY1
+
+    else:
+        dx = (imWidth - x)/imWidth*width + deltaX2
+        dy = -((imHeight - y)/imHeight*height + deltaY2)
+
 
     getToRotatingPosition(dx, dy)
 
@@ -211,6 +246,12 @@ def collect(x, y, pos):
 
     support_thread.stop()
 
+    pump_motor.on(SpeedPercent(-100))
+
+    time.sleep(0.5)
+
+    pump_motor.reset()
+
 def calibrate():
     moving_motor.on(SpeedPercent(100))
     while not touch.is_pressed:
@@ -218,7 +259,31 @@ def calibrate():
     moving_motor.stop()
 
     moving_motor.position = 0
+    camera_motor.position = 0
 
+def finish():
+    global support_thread
+    support_thread.stop()
+    moveCameraToPosition(1)
+    moving_motor.reset()
+    pump_motor.reset()
+    camera_motor.reset()
+    client.disconnect()
+    servo.write_i2c_block_data(0x01, 0x48, [0xFF])
+
+def moveCameraToPosition(pos):
+    if (pos == 1):
+        camera_motor.on(SpeedPercent(-50))
+        while (camera_motor.position > 0):
+            time.sleep(0.02)
+    else:
+        camera_motor.on(SpeedPercent(50))
+        while (camera_motor.position < cameraEnc):
+            time.sleep(0.02)
+    
+    camera_motor.stop()
+            
+        
 class MessageHandler():
     def __init__(self):
         self.state = 0
@@ -234,51 +299,99 @@ messagehandler = MessageHandler()
 def waitForCommand():
 
     while True:
-        if (messagehandler.state == 0):
-            time.sleep(0.005)
-      
-        if (messagehandler.state == 1):
-            message = messagehandler.message
-            print(message)
-            messagehandler.state = 0
-            
-            collect(message[1], message[2], message[3])
-        if (messagehandler.state == 2):
-            message = messagehandler.message
-            print(message)
-            messagehandler.state = 0
-            
-            rotateServo(udServo, message[1])
-            rotateServo(lrServo, message[2])
-        if (messagehandler.state == 3):
-            message = messagehandler.message
-            print(message)
-            messagehandler.state = 0
+        try : 
+            if (messagehandler.state == 0):
+                time.sleep(0.005)
+        
+            if (messagehandler.state == 1):
+                message = messagehandler.message
+                print(message)
+                messagehandler.state = 0
+                
+                collect(message[1], message[2], message[3], message[4])
+            if (messagehandler.state == 2):
+                message = messagehandler.message
+                print(message)
+                messagehandler.state = 0
+                
+                rotateServo(udServo, message[1])
+                rotateServo(lrServo, message[2])
+            if (messagehandler.state == 3):
+                message = messagehandler.message
+                print(message)
+                messagehandler.state = 0
 
-            target = message[1] - 50
+                target = message[1] - 50
 
-            position = moving_motor.position
-            if position < target:
-                moving_motor.on(SpeedPercent(100))
-                while moving_motor.position < target:
-                    time.sleep(0.001)
-                    #print(-moving_motor.position)
-                    client.send(1, moving_motor.position)
-                moving_motor.stop()
-            elif position > target:
-                moving_motor.on(SpeedPercent(-100))
-                while moving_motor.position > target:
-                    time.sleep(0.001)
-                    print(moving_motor.position)
-                    client.send(1, moving_motor.position)
-                moving_motor.stop()
+                position = moving_motor.position
+                if position < target:
+                    moving_motor.on(SpeedPercent(80))
+                    while moving_motor.position < target:
+                        time.sleep(0.001)
+                        #print(-moving_motor.position)
+                        client.send(1, moving_motor.position)
+                    moving_motor.stop()
+                elif position > target:
+                    moving_motor.on(SpeedPercent(-80))
+                    while moving_motor.position > target:
+                        time.sleep(0.001)
+                        print(moving_motor.position)
+                        client.send(1, moving_motor.position)
+                    moving_motor.stop()
+                if (messagehandler.state == 4):
+                    message = messagehandler.message
+                    print(message)
+                    messagehandler.state = 0
+
+                    moveCameraToPosition(2)
+
+                    rotateServo(lrServo, defaultAngle2)
+
+                    client.send(3, 0)
+
+                    time.sleep(1)
+
+                    target = 0
+
+                    position = moving_motor.position
+                    if position < target:
+                        moving_motor.on(SpeedPercent(80))
+                        while moving_motor.position < target:
+                            time.sleep(0.001)
+                            #print(-moving_motor.position)
+                            client.send(1, moving_motor.position)
+                        moving_motor.stop()
+                    elif position > target:
+                        moving_motor.on(SpeedPercent(-80))
+                        while moving_motor.position > target:
+                            time.sleep(0.001)
+                            print(moving_motor.position)
+                            client.send(1, moving_motor.position)
+                        moving_motor.stop()
+        except BaseException as e:
+            finish()
+            print ("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+            print (e)
+            break
+
+
+setServoPos(lrServo, defaultAngle)
+setServoPos(udServo, upAngle)
 
 rotateServoOnDefault()
 
 calibrate()
 
+moving_motor.stop()
+
+print("connecting")
+
 client.connect(messagehandler)
 
+print("connected")
 
+time.sleep(0.2)
 
 waitForCommand()
+
+finish()
