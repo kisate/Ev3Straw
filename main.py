@@ -165,25 +165,56 @@ def check(ref):
             print(q)
     return 
 
+def isInBase():
+
+
 def deliver(i):
 
     berry = allberries[i]
 
     send(1, berry['x'], berry['y'], berry['enc'], berry['half'])
+    while not readyToDeliver:
+        time.sleep(0.003)
+    
+    ret, frame = cap.read()
+    
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+    
+    mask = cv2.inRange(hsv, low1, high1)
+    mask += cv2.inRange(hsv, low2, high2)    
+    #mask += cv2.inRange(hsv, low3, high3)
+
+    cv2.bitwise_and(hsv, hsv, mask = mask)
+    connectivity = 7
+    output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
+    
+    num_labels = output[0]
+    labels = output[1]
+    stats = output[2]
+    centroids = output[3]
+
+    if(num_labels > 0):
+        for i in range(num_labels):
+            if (centroids[i][0] - berry['x'])**2 + (centroids[i][1] - berry['y'])**2 < 80:
+                send(5, centroids[i][0], centroids[i][1], berry['enc'], berry['half'])               
+    else:
+        send(6)    
 
     while delivering:
         time.sleep(0.003)
-
+    
     del q[0]
 
 def handleMessage(message):
-    global pos, delivering, switched
+    global pos, delivering, switched, readyToDeliver
     if message[0] == 1:
         pos = message[1]
     if message[0] == 2:
         delivering = False
     if message[0] == 3:
         switched = True
+    if message[0] == 4:
+        readyToDeliver = True
 
 def reader():
     global conn
