@@ -35,7 +35,7 @@ deltaX1 = -2
 deltaY1 = -4
 
 deltaX2 = -2
-deltaY2 = -4
+deltaY2 = -5
 
 udServo = 0
 lrServo = 5
@@ -43,7 +43,7 @@ lrServo = 5
 lastMessage = []
 
 host = '192.168.1.4'
-port = 51002 # random number
+port = 51003 # random number
 
 # code goes here ---------------
 
@@ -116,9 +116,6 @@ support_thread = SupportThread('support')
 def deliver():
     target = -10000
 
-    rotateServo(lrServo, defaultAngle, 0.05)
-    rotateServo(udServo, upAngle - 10)
-
     moving_motor.on(SpeedPercent(-100))
     
     while (moving_motor.position > target):
@@ -131,10 +128,19 @@ def deliver():
     support_thread.stop()
 
     pump_motor.on(SpeedPercent(-100))
-    time.sleep(10)
+    time.sleep(2)
+
+    rotateServo(udServo, upAngle - 10)
+
+    rotateServo(lrServo, 200)
+
+    moving_motor.on(SpeedPercent(50))
+    
+
+
     pump_motor.reset()
 
-    client.send(2, 0)
+    client.send(2)
 
     
 
@@ -176,6 +182,24 @@ def getRotAngle(dy):
     sinA = dy/length
     return max (0, (int)(256*acos(sinA)/pi) - 30)
 
+def rideToEnc(enc):
+    position = moving_motor.position
+    if position < enc:
+        moving_motor.on(SpeedPercent(80))
+        while moving_motor.position < enc:
+            time.sleep(0.001)
+            #print(-moving_motor.position)
+            client.send(1, moving_motor.position)
+        moving_motor.stop()
+    elif position > enc:
+        moving_motor.on(SpeedPercent(-80))
+        while moving_motor.position > enc:
+            time.sleep(0.001)
+            print(moving_motor.position)
+            client.send(1, moving_motor.position)
+        moving_motor.stop()
+                
+
 def getToRotatingPosition(dx, dy):
     print (dy)
     r = (length*length - dy*dy)**0.5
@@ -199,24 +223,11 @@ def getToRotatingPosition(dx, dy):
     
     moving_motor.stop()
 
-def collect(x, y, pos, half):
+def getToPickPosition(x, y, pos, half):
     rotateServo(lrServo, defaultAngle)
     rotateServo(udServo, upAngle)
-    delta = moving_motor.position - pos
-
-    if delta > 0 :
-
-        moving_motor.on(SpeedPercent(-100))
-
-        while(moving_motor.position > pos):
-            time.sleep(0.003)
-
-    else : 
-
-        moving_motor.on(SpeedPercent(100))
-
-        while(moving_motor.position < pos):
-            time.sleep(0.003)
+    
+    rideToEnc(pos)
     
     moving_motor.stop()
 
@@ -238,10 +249,47 @@ def collect(x, y, pos, half):
 
     rotateServo(lrServo, angle)
 
-    time.sleep(2)
-        
-    pick()
 
+
+def collect(_x, _y, _pos, _half):
+    
+    picked = False
+
+    x, y, pos, half = _x, _y, _pos, _half
+
+    while True:
+
+        getToPickPosition(x, y, pos, half)
+
+        time.sleep(2)
+
+        pick()
+
+        if (half == 1 ) : rotateServo(lrServo, defaultAngle, 0.05)
+        else : rotateServo(lrServo, defaultAngle2, 0.05)
+        rotateServo(udServo, upAngle - 10)
+
+        moveCameraToPosition(half)
+    
+        rideToEnc(pos)
+
+        client.send(4)
+
+        while (messagehandler.state == 0):
+            time.sleep(0.001)
+
+        
+        if (messagehandler.state == 5):
+            message = messagehandler.message
+            x, y, pos, half = message[1], message[2], message[3], message[4]
+            messagehandler.state = 0
+
+        elif (messagehandler.state == 6):
+            picked = True
+
+        if picked :
+            break
+    
     deliver()
 
     support_thread.stop()
@@ -264,9 +312,11 @@ def calibrate():
 def finish():
     global support_thread
     support_thread.stop()
-    moveCameraToPosition(1)
     moving_motor.reset()
     pump_motor.reset()
+    
+    moveCameraToPosition(1)
+    
     camera_motor.reset()
     client.disconnect()
     servo.write_i2c_block_data(0x01, 0x48, [0xFF])
@@ -347,7 +397,7 @@ def waitForCommand():
 
                     rotateServo(lrServo, defaultAngle2)
 
-                    client.send(3, 0)
+                    client.send(3)
 
                     time.sleep(1)
 
