@@ -21,7 +21,7 @@ height = 20.5
 
 
 host = '192.168.1.4'
-port = 51002 # random number
+port = 51003 # random number
 a = True
 
 q = []
