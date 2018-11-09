@@ -165,10 +165,8 @@ def check(ref):
             print(q)
     return 
 
-def isInBase():
 
-
-def deliver(i):
+def deliver(i): 
 
     berry = allberries[i]
 
