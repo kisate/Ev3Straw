@@ -21,7 +21,7 @@ height = 20.5
 
 
 host = '192.168.1.4'
-port = 51003 # random number
+port = 51004 # random number
 a = True
 
 q = []
@@ -37,9 +37,10 @@ first = -1
 collected = 0 
 delivering = False
 switched = False
+readyToDeliver = False
 
 pos = 0
-cap = cv2.VideoCapture(1)
+cap = cv2.VideoCapture(6)
 
 cv2.namedWindow('image')
 
@@ -170,33 +171,56 @@ def deliver(i):
 
     berry = allberries[i]
 
+    print(berry)
+
     send(1, berry['x'], berry['y'], berry['enc'], berry['half'])
     while not readyToDeliver:
         time.sleep(0.003)
     
-    ret, frame = cap.read()
-    
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    
-    mask = cv2.inRange(hsv, low1, high1)
-    mask += cv2.inRange(hsv, low2, high2)    
-    #mask += cv2.inRange(hsv, low3, high3)
+    print ("Trying")
 
-    cv2.bitwise_and(hsv, hsv, mask = mask)
-    connectivity = 7
-    output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
-    
-    num_labels = output[0]
-    labels = output[1]
-    stats = output[2]
-    centroids = output[3]
+    while True:
+        
+        ret, frame = cap.read()
+        
+        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+        
+        mask = cv2.inRange(hsv, low1, high1)
+        mask += cv2.inRange(hsv, low2, high2)    
+        #mask += cv2.inRange(hsv, low3, high3)
+        print ("BLYAT")
+        cv2.bitwise_and(hsv, hsv, mask = mask)
+        connectivity = 7
+        output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
+        print ("GOVNO")
+        num_labels = output[0]
+        labels = output[1]
+        stats = output[2]
+        centroids = output[3]
+        print ("EBAL")
+        print(frame)
+        picked = True
 
-    if(num_labels > 0):
-        for i in range(num_labels):
-            if (centroids[i][0] - berry['x'])**2 + (centroids[i][1] - berry['y'])**2 < 80:
-                send(5, centroids[i][0], centroids[i][1], berry['enc'], berry['half'])               
-    else:
-        send(6)    
+        cv2.imshow("image", frame)
+
+        print(num_labels)
+
+        if(num_labels > 0):
+            for j in range(num_labels):
+                x, y, w, h, s = stats[j]
+                print("square{}".format(s))
+                if s > 2500 and s < 50000:
+                    print((centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2)
+                    if (centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2 < 5000:
+
+                        send(5, centroids[j][1], centroids[j][0], berry['enc'], berry['half'])
+                        picked = False      
+         
+        if picked:
+            send(6)    
+            break
+
+        print ("Retrying")
 
     while delivering:
         time.sleep(0.003)
@@ -228,12 +252,12 @@ def reader():
 
         message_size = struct.unpack('>b', part)[0]
 
-        print "{} {}".format(part, struct.unpack('>b', part))
+        #print "{} {}".format(part, struct.unpack('>b', part))
 
         for i in range(message_size):
             part = conn.recv(8)
             
-            print "{} {}".format(part, struct.unpack('>q', part))
+            #print "{} {}".format(part, struct.unpack('>q', part))
             message.append(struct.unpack('>q', part)[0])
             #message.append(int.from_bytes(part, byteorder='big', signed=True))
 
@@ -388,8 +412,7 @@ while(pos < -50):
 
 print "done"
 
-cap.release()
-cv2.destroyAllWindows()    
+#cv2.destroyAllWindows()    
 ref = initialize()
 im = pyimgur.Imgur(CLIENT_ID)
 
@@ -476,4 +499,9 @@ thread1.start()
 
 print('fin')
 
-exit()
+while True:
+    try:
+        time.sleep(0.01)
+    except KeyboardInterrupt:
+        cap.release()
+

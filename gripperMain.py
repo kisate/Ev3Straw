@@ -43,7 +43,7 @@ lrServo = 5
 lastMessage = []
 
 host = '192.168.1.4'
-port = 51003 # random number
+port = 51004 # random number
 
 # code goes here ---------------
 
@@ -119,7 +119,7 @@ def deliver():
     moving_motor.on(SpeedPercent(-100))
     
     while (moving_motor.position > target):
-        client.send(1, -moving_motor.position)
+        client.send(1, moving_motor.position)
 
     moving_motor.stop()
 
@@ -188,7 +188,7 @@ def rideToEnc(enc):
         moving_motor.on(SpeedPercent(80))
         while moving_motor.position < enc:
             time.sleep(0.001)
-            #print(-moving_motor.position)
+            print(moving_motor.position)
             client.send(1, moving_motor.position)
         moving_motor.stop()
     elif position > enc:
@@ -227,6 +227,8 @@ def getToPickPosition(x, y, pos, half):
     rotateServo(lrServo, defaultAngle)
     rotateServo(udServo, upAngle)
     
+    print (pos)
+
     rideToEnc(pos)
     
     moving_motor.stop()
@@ -275,6 +277,8 @@ def collect(_x, _y, _pos, _half):
 
         client.send(4)
 
+        print ("Waiting for response")
+
         while (messagehandler.state == 0):
             time.sleep(0.001)
 
@@ -283,9 +287,12 @@ def collect(_x, _y, _pos, _half):
             message = messagehandler.message
             x, y, pos, half = message[1], message[2], message[3], message[4]
             messagehandler.state = 0
+            support_thread.stop()
+            print ("Not picked")
 
         elif (messagehandler.state == 6):
             picked = True
+            print ("Picked")
 
         if picked :
             break
@@ -325,11 +332,11 @@ def moveCameraToPosition(pos):
     if (pos == 1):
         camera_motor.on(SpeedPercent(-50))
         while (camera_motor.position > 0):
-            time.sleep(0.02)
+            time.sleep(0.003)
     else:
         camera_motor.on(SpeedPercent(50))
         while (camera_motor.position < cameraEnc):
-            time.sleep(0.02)
+            time.sleep(0.003)
     
     camera_motor.stop()
             
