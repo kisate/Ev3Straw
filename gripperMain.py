@@ -132,12 +132,6 @@ def deliver():
 
     rotateServo(udServo, upAngle - 10)
 
-    rotateServo(lrServo, 200)
-
-    moving_motor.on(SpeedPercent(50))
-    
-
-
     pump_motor.reset()
 
     client.send(2)
@@ -182,20 +176,23 @@ def getRotAngle(dy):
     sinA = dy/length
     return max (0, (int)(256*acos(sinA)/pi) - 30)
 
-def rideToEnc(enc):
+def rideToEnc(enc, percent = 80):
     position = moving_motor.position
+
+    print ("Riding to {}".format(enc))
+
     if position < enc:
-        moving_motor.on(SpeedPercent(80))
+        moving_motor.on(SpeedPercent(percent))
         while moving_motor.position < enc:
             time.sleep(0.001)
-            print(moving_motor.position)
+            #print(moving_motor.position)
             client.send(1, moving_motor.position)
         moving_motor.stop()
     elif position > enc:
-        moving_motor.on(SpeedPercent(-80))
+        moving_motor.on(SpeedPercent(-percent))
         while moving_motor.position > enc:
             time.sleep(0.001)
-            print(moving_motor.position)
+            #print(moving_motor.position)
             client.send(1, moving_motor.position)
         moving_motor.stop()
                 
@@ -224,7 +221,8 @@ def getToRotatingPosition(dx, dy):
     moving_motor.stop()
 
 def getToPickPosition(x, y, pos, half):
-    rotateServo(lrServo, defaultAngle)
+    if (half == 1 ) : rotateServo(lrServo, defaultAngle, 0.05)
+    else : rotateServo(lrServo, defaultAngle2, 0.05)
     rotateServo(udServo, upAngle)
     
     print (pos)
@@ -261,11 +259,15 @@ def collect(_x, _y, _pos, _half):
 
     while True:
 
+        rotateServo(udServo, upAngle)
+
         getToPickPosition(x, y, pos, half)
 
         time.sleep(2)
 
         pick()
+
+        rotateServo(udServo, upAngle)
 
         if (half == 1 ) : rotateServo(lrServo, defaultAngle, 0.05)
         else : rotateServo(lrServo, defaultAngle2, 0.05)
@@ -273,7 +275,7 @@ def collect(_x, _y, _pos, _half):
 
         moveCameraToPosition(half)
     
-        rideToEnc(pos)
+        rideToEnc(pos, 20)
 
         client.send(4)
 
@@ -291,6 +293,7 @@ def collect(_x, _y, _pos, _half):
             print ("Not picked")
 
         elif (messagehandler.state == 6):
+            messagehandler.state = 0
             picked = True
             print ("Picked")
 
@@ -299,7 +302,7 @@ def collect(_x, _y, _pos, _half):
     
     deliver()
 
-    support_thread.stop()
+    #support_thread.stop()
 
     pump_motor.on(SpeedPercent(-100))
 
@@ -432,8 +435,8 @@ def waitForCommand():
             break
 
 
-setServoPos(lrServo, defaultAngle)
-setServoPos(udServo, upAngle)
+rotateServo(lrServo, defaultAngle)
+rotateServo(udServo, upAngle)
 
 rotateServoOnDefault()
 

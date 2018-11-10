@@ -10,13 +10,13 @@ import pyimgur
 import struct
 import os, glob, pickle
 import logging 
+import traceback
 #from getkey import getkey, keys
 from time import sleep
 import tellopy
 
 imHeight = 480
 height = 20.5
-
 
 host = '192.168.1.4'
 port = 51004 # random number
@@ -38,9 +38,9 @@ collected = 0
 delivering = False
 switched = False
 readyToDeliver = False
+cameraId = 1
 
 pos = 0
-cap = cv2.VideoCapture(2)
 
 cv2.namedWindow('image')
 
@@ -126,67 +126,6 @@ def handleMessage(message):
     if message[0] == 4:
         readyToDeliver = True
 
-
-def deliver(i): 
-
-    berry = allberries[i]
-
-    print(berry)
-
-    send(1, berry['x'], berry['y'], berry['enc'], berry['half'])
-    while not readyToDeliver:
-        time.sleep(0.003)
-    
-    print ("Trying")
-
-    while True:
-        
-        ret, frame = cap.read()
-        
-        hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-        
-        mask = cv2.inRange(hsv, low1, high1)
-        mask += cv2.inRange(hsv, low2, high2)    
-        #mask += cv2.inRange(hsv, low3, high3)
-        print ("BLYAT")
-        cv2.bitwise_and(hsv, hsv, mask = mask)
-        connectivity = 7
-        output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
-        print ("GOVNO")
-        num_labels = output[0]
-        labels = output[1]
-        stats = output[2]
-        centroids = output[3]
-        print(frame)
-        picked = True
-
-        cv2.imshow("image", frame)
-
-        print(num_labels)
-
-        if(num_labels > 0):
-            for j in range(num_labels):
-                x, y, w, h, s = stats[j]
-                print("square{}".format(s))
-                if s > 2500 and s < 50000:
-                    print((centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2)
-                    if (centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2 < 5000:
-
-                        send(5, centroids[j][1], centroids[j][0], berry['enc'], berry['half'])
-                        picked = False      
-         
-        if picked:
-            send(6)    
-            break
-
-        print ("Retrying")
-
-    while delivering:
-        time.sleep(0.003)
-    
-    del q[0]
-
-
 def reader():
     global conn
     
@@ -245,6 +184,7 @@ threading.Thread(target=reader, args=()).start()
 while state != 6:
     try : 
         if state == 1:
+            cap = cv2.VideoCapture(cameraId)
             send(3, endPos)
 
             while(pos > endPos):
@@ -369,7 +309,7 @@ while state != 6:
                     cv2.destroyAllWindows()  
                     exit()
 
-
+            cap.release()
             print "done"
 
             state = 2
@@ -410,7 +350,11 @@ while state != 6:
                     if (scores[0][index] > 0.2):
                         box = boxes[0][index]
                         classID = int(classes[0][index])
-                        pointA, pointB = (min(int(box[1]*width), int(box[3]*width)), min(int(box[0]*width), int(box[2]*width))), (max(int(box[1]*width), int(box[3]*width)), max(int(box[0]*width), int(box[2]*width)))
+
+                        coef1 = 0.75
+                        coef2 = 0.75
+
+                        pointA, pointB = (min(int(box[1]*width), int(box[3]*width)), min(int(box[0]*width*coef1), int(box[2]*width*coef1))), (max(int(box[1]*width), int(box[3]*width)), max(int(box[0]*width*coef2), int(box[2]*width*coef2)))
                         cv2.rectangle(frame, pointA, pointB, colormap[classID-1], 4)
                         
                         print (str(pointA))
@@ -422,8 +366,8 @@ while state != 6:
                         #print "Berry {} minx: {} maxx: {} x : {} \nminy: {} maxy: {} y : {} \n".format(min(pointA[0], pointB[0]), max(pointA[0], pointB[0]), berry['x'], min(pointA[1], pointB[1]),  max(pointA[1], pointB[1]), berry['y'] )
                         
                         if (pointA[0] < berry['y'] < pointB[0] and pointA[1] < berry['x'] < pointB[1]):
-                            #res = {'classID' : classID, 'x' : int((pointA[1] + pointB[1]) / 2), 'y' : int((pointA[0] + pointB[0]) / 2)}
-                            res = {'classID' : classID, 'x' : berry['x'], 'y' : berry['y']}
+                            res = {'classID' : classID, 'x' : int((pointA[1] + pointB[1]) / 2), 'y' : int((pointA[0] + pointB[0]) / 2)}
+                            # res = {'classID' : classID, 'x' : berry['x'], 'y' : berry['y']}
                             print "yep{}".format(index)
 
                 #cv2.imshow("image{}".format(i), frame)
@@ -510,13 +454,30 @@ while state != 6:
             print(berry)
 
             send(1, berry['x'], berry['y'], berry['enc'], berry['half'])
-            while not readyToDeliver:
-                time.sleep(0.003)
             
             print ("Trying")
 
-            while True:
-                            
+
+            cap = cv2.VideoCapture(cameraId)
+
+            
+            while True:    
+
+                while not readyToDeliver:
+                    time.sleep(0.003)
+                
+                readyToDeliver = False
+
+                cap_read_retries = 0
+
+                while cap_read_retries < 5:        
+                    ret, frame = cap.read()
+                    
+                    time.sleep(0.01)
+                    cap_read_retries+=1
+
+                hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
                 mask = cv2.inRange(hsv, low1, high1)
                 mask += cv2.inRange(hsv, low2, high2)    
                 cv2.bitwise_and(hsv, hsv, mask = mask)
@@ -524,27 +485,26 @@ while state != 6:
                 output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
                 num_labels = output[0]
                 labels = output[1]
-                stats = output[2]
+                image_stats = output[2]
                 centroids = output[3]
-                print(frame)
-                picked = True
 
-                cv2.imshow("image", frame)
+                picked = True
 
                 print(num_labels)
 
                 if(num_labels > 0):
                     for j in range(num_labels):
-                        x, y, w, h, s = stats[j]
+                        x, y, w, h, s = image_stats[j]
                         print("square{}".format(s))
                         if s > 2500 and s < 50000:
                             print((centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2)
-                            if (centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2 < 5000:
+                            if (centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2 < 10000:
 
                                 send(5, centroids[j][1], centroids[j][0], berry['enc'], berry['half'])
                                 picked = False      
                 if picked:
-                    send(6)    
+                    send(6)  
+                    cap.release()  
                     break
                 print ("Retrying")
             while delivering:
@@ -583,8 +543,8 @@ while state != 6:
                     drone.quit()
                     break
             state == 6
-    except e as BaseException:
-        print(e)
+    except BaseException as e:
+        traceback.print_exc()
         cap.release()
         conn.close()
         exit()
