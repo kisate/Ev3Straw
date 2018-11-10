@@ -10,7 +10,7 @@ import pyimgur
 import struct
 import os, glob, pickle
 import logging 
-from getkey import getkey, keys
+#from getkey import getkey, keys
 from time import sleep
 import tellopy
 
@@ -28,7 +28,7 @@ changed_id = []
 changed_stats = []
 CLIENT_ID = "733b83d64f87370"
 
-state = 0
+state = 1
 
 endPos = -10000
 
@@ -40,7 +40,7 @@ switched = False
 readyToDeliver = False
 
 pos = 0
-cap = cv2.VideoCapture(6)
+cap = cv2.VideoCapture(2)
 
 cv2.namedWindow('image')
 
@@ -236,268 +236,355 @@ def send(*args):
 
     conn.send(msg)
 
+conn, addr = s.accept()
+
+print(addr)
+
 threading.Thread(target=reader, args=()).start()
+
 while state != 6:
-    ret, frame = cap.read()
-    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
-    if state == 1:
-        while(pos > endPos):
-            # Capture frame-by-frame    
-            
-            mask = cv2.inRange(hsv, low1, high1)
-            mask += cv2.inRange(hsv, low2, high2)    
-            #mask += cv2.inRange(hsv, low3, high3)
+    try : 
+        if state == 1:
+            send(3, endPos)
 
-            cv2.bitwise_and(hsv, hsv, mask = mask)
-            connectivity = 7
-            output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
-            
-            num_labels = output[0]
-            labels = output[1]
-            stats = output[2]
-            centroids = output[3]
-                        
-            del berries[(switch + 1)%2][:]
-            for i in range(num_labels):
-                x, y, w, h, s = stats[i]
-                if s > 2500 and s < 50000 and y > 50 and y < 100:            
-                    sx = hex(x)[2:].zfill(4) 
-                    sy = hex(y)[2:].zfill(4) 
-
-                    croped = frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]   
-                    #cv2.rectangle(frame,(x,y),(x+w,y+h),(0,0,255),3)    
-                    cv2.circle(frame,(int(centroids[i][0]), int(centroids[i][1])), 10, (0,255,0), -1)
-
-                    a = 2500
-                    b = -1
-
-                    for berry in berries[(switch)%2]:    
-                        r = (berry['x'] - centroids[i][0])**2 + (berry['y'] - centroids[i][1]) 
-                        if r < a:
-                            a = r
-                            b = berry['id']        
-                    if b == -1:
-                        lastid+=1
-                        berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid})
-
-                        allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame, 'half' : 1})
-
-                        #allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]})
-                        #allberries.append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid, 'enc' : 311})
-                    else :
-                        berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : b})
-            switch=(switch + 1)%2
-            cv2.imshow('image', frame)
-        state = 2
-    if state == 2:
-        ref = initialize()
-        im = pyimgur.Imgur(CLIENT_ID)
-
-        db.reference('/berrys').delete()
-        for i, berry in enumerate(allberries):
-            
-            frame = berry['frame']
-
-            #cv2.imshow("image{}".format(i), frame)   
-            
-            cv2.imwrite("../photos/imgt.png", frame)
-            os.rename("../photos/imgt.png", "../photos/img.png")
-            
-            print i
-
-            response = glob.glob('../photos/classes.out')
-            while (len(response) == 0):
-                response = glob.glob('../photos/classes.out')
-                time.sleep(0.03)
-
-            f = open("../photos/classes.out", "rb")
-            
-            data = pickle.load(f)
-
-            f.close()
-
-            boxes, scores, classes, num_classes = data
-
-            height, width, _ = frame.shape
-            
-            res = None
-
-            for index in range(int(num_classes[0])):
-                if (scores[0][index] > 0.2):
-                    box = boxes[0][index]
-                    classID = int(classes[0][index])
-                    pointA, pointB = (min(int(box[1]*width), int(box[3]*width)), min(int(box[0]*width), int(box[2]*width))), (max(int(box[1]*width), int(box[3]*width)), max(int(box[0]*width), int(box[2]*width)))
-                    cv2.rectangle(frame, pointA, pointB, colormap[classID-1], 4)
-                    
-                    print (str(pointA))
-
-                    print (str(pointB))
-
-                    print ("{} {}".format(berry['x'], berry['y']))
-
-                    #print "Berry {} minx: {} maxx: {} x : {} \nminy: {} maxy: {} y : {} \n".format(min(pointA[0], pointB[0]), max(pointA[0], pointB[0]), berry['x'], min(pointA[1], pointB[1]),  max(pointA[1], pointB[1]), berry['y'] )
-                    
-                    if (pointA[0] < berry['y'] < pointB[0] and pointA[1] < berry['x'] < pointB[1]):
-                        #res = {'classID' : classID, 'x' : int((pointA[1] + pointB[1]) / 2), 'y' : int((pointA[0] + pointB[0]) / 2)}
-                        res = {'classID' : classID, 'x' : berry['x'], 'y' : berry['y']}
-                        print "yep{}".format(index)
-
-            #cv2.imshow("image{}".format(i), frame)
-
-            cv2.imwrite("../neurooutput/image{}.png".format(i), frame)
-
-            os.remove("../photos/classes.out")
-            
-            if res is not None:
-
-                # uploaded_image = im.upload_image("../photos/img{}.png".format(i), title="Strawberry {}".format(i))
+            while(pos > endPos):
+                # Capture frame-by-frame    
+                ret, frame = cap.read()
                 
-                link = 'https://i.imgur.com/CQdaHBw.png'
+                hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                
+                mask = cv2.inRange(hsv, low1, high1)
+                mask += cv2.inRange(hsv, low2, high2)    
+                #mask += cv2.inRange(hsv, low3, high3)
 
-                # print(uploaded_image.link)
-                create_new(ref, -berry['enc'], i+1, 100, 0, str(link), res['x'], res['y']/imHeight*height, res['classID'], berry['half'])
+                cv2.bitwise_and(hsv, hsv, mask = mask)
+                connectivity = 7
+                output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
+                
+                num_labels = output[0]
+                labels = output[1]
+                stats = output[2]
+                centroids = output[3]
+                
+                
+                del berries[(switch + 1)%2][:]
+                for i in range(num_labels):
+                    x, y, w, h, s = stats[i]
+                    if s > 2500 and s < 50000 and y > 50 and y < 100:            
+                        sx = hex(x)[2:].zfill(4) 
+                        sy = hex(y)[2:].zfill(4) 
 
-                print "created"
-                # create_new(ref, -berry['enc'], i+1, 100, 0, str(uploaded_image.link), int(berry['x']), berry['y']/imHeight*height)
-            else :
-                link = 'https://i.imgur.com/CQdaHBw.png'
+                        croped = frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]   
+                        #cv2.rectangle(frame,(x,y),(x+w,y+h),(0,0,255),3)    
+                        cv2.circle(frame,(int(centroids[i][0]), int(centroids[i][1])), 10, (0,255,0), -1)
 
-                # print(uploaded_image.link)
-                create_new(ref, -berry['enc'], i+1, 100, 0, str(link), berry['x'], berry['y']/imHeight*height, -1, berry['half'])
+                        a = 2500
+                        b = -1
 
-                print "created not berry"
-        state = 3
-    if state == 3:
-        while(state != 4):
-                global delivering, collected
+                        for berry in berries[(switch)%2]:    
+                            r = (berry['x'] - centroids[i][0])**2 + (berry['y'] - centroids[i][1]) 
+                            if r < a:
+                                a = r
+                                b = berry['id']        
+                        if b == -1:
+                            lastid+=1
+                            berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid})
 
-                size = len(ref.get())
-                arr = ref.get()
-                stats = []
-                new_stats = []
-                for i in range(1, size):
-                    stats.append(ref.child(str(i)).child('status').get())
-                isc = False
-                while True:
-                    new_stats[:] = []
-                    ref = db.reference('/berrys')
-                    for i in range(1, size):
-                            new_stats.append(ref.child(str(i)).child('status').get())
-                    print("new status", new_stats)
-                    dif = len(new_stats) - len(stats)
-                    for i in range(dif):
-                        stats.append('')
+                            allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame, 'half' : 1})
 
-                    for i in range(len(new_stats)):
-                        if not(int(new_stats[i]) == int(stats[i])):
-                            #print("Found difference")
-                            changed_id.append(i + 1)
-                            changed_stats.append(new_stats[i])
-                            isc = True
-                    if isc ==  True:
-                        stats = list(new_stats)
-                        # print(changed_id)
-                        # print(changed_stats)
-                        for i in range(len(changed_stats)):
-                            if changed_stats[i] == '1':
-                                q.append(changed_id[i])
-                                del changed_id[i]
-                                del changed_stats[i]
-                                if not delivering : 
-                                    state = 4
-                                    delivering = True
-                            elif changed_stats[i] == '2':
-                                q.remove(changed_id[i])
-                                del changed_id[i]
-                                del changed_stats[i]
-                                if delivering : 
-                                    delivering = False
-                                    collected+=1
-                                    if collected == len(allberries) : close()
-                                    if len(q) > 0 :
-                                        delivering = True
-                                        state = 4
-                                        
-                        isc = False
-                        print(q)
-    if state == 4:
-        currentBerry = q[0] - 1
-        print(currentBerry)
-        berry = allberries[currentBerry]
+                            #allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]})
+                            #allberries.append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid, 'enc' : 311})
+                        else :
+                            berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : b})
 
-        print(berry)
+                print(pos)
+                switch=(switch + 1)%2
+                cv2.imshow('image', frame)
+                
+                if cv2.waitKey(1)  == ord('q'):
+                    cap.release()
+                    cv2.destroyAllWindows()  
+                    exit()
 
-        send(1, berry['x'], berry['y'], berry['enc'], berry['half'])
-        while not readyToDeliver:
-            time.sleep(0.003)
-        
-        print ("Trying")
+            send(4)
 
-        while True:
+            while (not switched) : time.sleep(0.01)
+
+            while(pos < -50):
+                # Capture frame-by-frame    
+                ret, frame = cap.read()
+                
+                hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+                
+                mask = cv2.inRange(hsv, low1, high1)
+                mask += cv2.inRange(hsv, low2, high2)    
+                #mask += cv2.inRange(hsv, low3, high3)
+
+                cv2.bitwise_and(hsv, hsv, mask = mask)
+                connectivity = 7
+                output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
+                
+                num_labels = output[0]
+                labels = output[1]
+                stats = output[2]
+                centroids = output[3]
+                
+                
+                del berries[(switch + 1)%2][:]
+                for i in range(num_labels):
+                    x, y, w, h, s = stats[i]
+                    if s > 2500 and s < 50000 and y > 50 and y < 100:            
+                        sx = hex(x)[2:].zfill(4) 
+                        sy = hex(y)[2:].zfill(4) 
+
+                        croped = frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]   
+                        #cv2.rectangle(frame,(x,y),(x+w,y+h),(0,0,255),3)    
+                        cv2.circle(frame,(int(centroids[i][0]), int(centroids[i][1])), 10, (0,255,0), -1)
+
+                        a = 2500
+                        b = -1
+
+                        for berry in berries[(switch)%2]:    
+                            r = (berry['x'] - centroids[i][0])**2 + (berry['y'] - centroids[i][1]) 
+                            if r < a:
+                                a = r
+                                b = berry['id']        
+                        if b == -1:
+                            lastid+=1
+                            berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid})
+
+                            allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame, 'half' : 2})
+
+                            #allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]})
+                            #allberries.append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid, 'enc' : 311})
+                        else :
+                            berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : b})
+
+                print(pos)
+                switch=(switch + 1)%2
+                cv2.imshow('image', frame)
+                
+                if cv2.waitKey(1)  == ord('q'):
+                    cap.release()
+                    cv2.destroyAllWindows()  
+                    exit()
+
+
+            print "done"
+
+            state = 2
+        if state == 2:
+            ref = initialize()
+            im = pyimgur.Imgur(CLIENT_ID)
+
+            db.reference('/berrys').delete()
+            for i, berry in enumerate(allberries):
+                
+                frame = berry['frame']
+
+                #cv2.imshow("image{}".format(i), frame)   
+                
+                cv2.imwrite("../photos/imgt.png", frame)
+                os.rename("../photos/imgt.png", "../photos/img.png")
+                
+                print i
+
+                response = glob.glob('../photos/classes.out')
+                while (len(response) == 0):
+                    response = glob.glob('../photos/classes.out')
+                    time.sleep(0.03)
+
+                f = open("../photos/classes.out", "rb")
+                
+                data = pickle.load(f)
+
+                f.close()
+
+                boxes, scores, classes, num_classes = data
+
+                height, width, _ = frame.shape
+                
+                res = None
+
+                for index in range(int(num_classes[0])):
+                    if (scores[0][index] > 0.2):
+                        box = boxes[0][index]
+                        classID = int(classes[0][index])
+                        pointA, pointB = (min(int(box[1]*width), int(box[3]*width)), min(int(box[0]*width), int(box[2]*width))), (max(int(box[1]*width), int(box[3]*width)), max(int(box[0]*width), int(box[2]*width)))
+                        cv2.rectangle(frame, pointA, pointB, colormap[classID-1], 4)
                         
-            mask = cv2.inRange(hsv, low1, high1)
-            mask += cv2.inRange(hsv, low2, high2)    
-            cv2.bitwise_and(hsv, hsv, mask = mask)
-            connectivity = 7
-            output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
-            num_labels = output[0]
-            labels = output[1]
-            stats = output[2]
-            centroids = output[3]
-            print(frame)
-            picked = True
+                        print (str(pointA))
 
-            cv2.imshow("image", frame)
+                        print (str(pointB))
 
-            print(num_labels)
+                        print ("{} {}".format(berry['x'], berry['y']))
 
-            if(num_labels > 0):
-                for j in range(num_labels):
-                    x, y, w, h, s = stats[j]
-                    print("square{}".format(s))
-                    if s > 2500 and s < 50000:
-                        print((centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2)
-                        if (centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2 < 5000:
+                        #print "Berry {} minx: {} maxx: {} x : {} \nminy: {} maxy: {} y : {} \n".format(min(pointA[0], pointB[0]), max(pointA[0], pointB[0]), berry['x'], min(pointA[1], pointB[1]),  max(pointA[1], pointB[1]), berry['y'] )
+                        
+                        if (pointA[0] < berry['y'] < pointB[0] and pointA[1] < berry['x'] < pointB[1]):
+                            #res = {'classID' : classID, 'x' : int((pointA[1] + pointB[1]) / 2), 'y' : int((pointA[0] + pointB[0]) / 2)}
+                            res = {'classID' : classID, 'x' : berry['x'], 'y' : berry['y']}
+                            print "yep{}".format(index)
 
-                            send(5, centroids[j][1], centroids[j][0], berry['enc'], berry['half'])
-                            picked = False      
-            if picked:
-                send(6)    
-                break
-            print ("Retrying")
-        while delivering:
-            time.sleep(0.003)
-        del q[0]
-        state = 3 
-    if state == 5:
-        drone = tellopy.Tello()
-        drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
-        drone.connect()
-        while drone.connected:
-            key = getkey()
-            if key == 'u':
-                drone.takeoff()
-                drone.down(60)
-                drone.right(15)
-                sleep(4)
-                drone.down(0)
-                drone.right(0)
-                sleep(1)
-                drone.down(40)
-                sleep(3)
-                drone.down(0)
-                sleep(2)
-                drone.forward(20)
-                sleep(3)
-                drone.forward(0)
-                sleep(1)
-                drone.right(20)
-                sleep(4)
-                drone.right(0)
-                sleep(3)
-                drone.down(50)
-                drone.land()
-                sleep(5)
-                drone.quit()
-                break
-        state == 6
+                #cv2.imshow("image{}".format(i), frame)
+
+                cv2.imwrite("../neurooutput/image{}.png".format(i), frame)
+
+                os.remove("../photos/classes.out")
+                
+                if res is not None:
+
+                    # uploaded_image = im.upload_image("../photos/img{}.png".format(i), title="Strawberry {}".format(i))
+                    
+                    link = 'https://i.imgur.com/CQdaHBw.png'
+
+                    # print(uploaded_image.link)
+                    create_new(ref, -berry['enc'], i+1, 100, 0, str(link), res['x'], res['y']/imHeight*height, res['classID'], berry['half'])
+
+                    print "created"
+                    # create_new(ref, -berry['enc'], i+1, 100, 0, str(uploaded_image.link), int(berry['x']), berry['y']/imHeight*height)
+                else :
+                    link = 'https://i.imgur.com/CQdaHBw.png'
+
+                    # print(uploaded_image.link)
+                    create_new(ref, -berry['enc'], i+1, 100, 0, str(link), berry['x'], berry['y']/imHeight*height, -1, berry['half'])
+
+                    print "created not berry"
+            state = 3
+            size = len(ref.get())
+            arr = ref.get()
+            stats = []
+            new_stats = []
+            for i in range(1, size):
+                stats.append(ref.child(str(i)).child('status').get())
+            isc = False
+        if state == 3:
+            while(state != 4):
+                new_stats[:] = []
+                ref = db.reference('/berrys')
+                for i in range(1, size):
+                        new_stats.append(ref.child(str(i)).child('status').get())
+                print("new status", new_stats)
+                dif = len(new_stats) - len(stats)
+                for i in range(dif):
+                    stats.append('')
+
+                for i in range(len(new_stats)):
+                    if not(int(new_stats[i]) == int(stats[i])):
+                        #print("Found difference")
+                        changed_id.append(i + 1)
+                        changed_stats.append(new_stats[i])
+                        isc = True
+                if isc ==  True:
+                    stats = list(new_stats)
+                    # print(changed_id)
+                    # print(changed_stats)
+                    for i in range(len(changed_stats)):
+                        if changed_stats[i] == '1':
+                            q.append(changed_id[i])
+                            del changed_id[i]
+                            del changed_stats[i]
+                            if not delivering : 
+                                state = 4
+                                delivering = True
+                        elif changed_stats[i] == '2':
+                            q.remove(changed_id[i])
+                            del changed_id[i]
+                            del changed_stats[i]
+                            if delivering : 
+                                delivering = False
+                                collected+=1
+                                if collected == len(allberries) : close()
+                                if len(q) > 0 :
+                                    delivering = True
+                                    state = 4
+                                    
+                    isc = False
+                    print(q)
+                        
+        if state == 4:
+            currentBerry = q[0] - 1
+            print(currentBerry)
+            berry = allberries[currentBerry]
+
+            print(berry)
+
+            send(1, berry['x'], berry['y'], berry['enc'], berry['half'])
+            while not readyToDeliver:
+                time.sleep(0.003)
+            
+            print ("Trying")
+
+            while True:
+                            
+                mask = cv2.inRange(hsv, low1, high1)
+                mask += cv2.inRange(hsv, low2, high2)    
+                cv2.bitwise_and(hsv, hsv, mask = mask)
+                connectivity = 7
+                output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
+                num_labels = output[0]
+                labels = output[1]
+                stats = output[2]
+                centroids = output[3]
+                print(frame)
+                picked = True
+
+                cv2.imshow("image", frame)
+
+                print(num_labels)
+
+                if(num_labels > 0):
+                    for j in range(num_labels):
+                        x, y, w, h, s = stats[j]
+                        print("square{}".format(s))
+                        if s > 2500 and s < 50000:
+                            print((centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2)
+                            if (centroids[j][1] - berry['x'])**2 + (centroids[j][0] - berry['y'])**2 < 5000:
+
+                                send(5, centroids[j][1], centroids[j][0], berry['enc'], berry['half'])
+                                picked = False      
+                if picked:
+                    send(6)    
+                    break
+                print ("Retrying")
+            while delivering:
+                time.sleep(0.003)
+            del q[0]
+            state = 3 
+        if state == 5:
+            drone = tellopy.Tello()
+            drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
+            drone.connect()
+            while drone.connected:
+                key = getkey()
+                if key == 'u':
+                    drone.takeoff()
+                    drone.down(60)
+                    drone.right(15)
+                    sleep(4)
+                    drone.down(0)
+                    drone.right(0)
+                    sleep(1)
+                    drone.down(40)
+                    sleep(3)
+                    drone.down(0)
+                    sleep(2)
+                    drone.forward(20)
+                    sleep(3)
+                    drone.forward(0)
+                    sleep(1)
+                    drone.right(20)
+                    sleep(4)
+                    drone.right(0)
+                    sleep(3)
+                    drone.down(50)
+                    drone.land()
+                    sleep(5)
+                    drone.quit()
+                    break
+            state == 6
+    except e as BaseException:
+        print(e)
+        cap.release()
+        conn.close()
+        exit()
