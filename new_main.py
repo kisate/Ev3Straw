@@ -15,6 +15,7 @@ from getkey import getkey, keys
 from time import sleep
 import tellopy
 from wireless import Wireless
+import base64
 
 imHeight = 480
 height = 20.5
@@ -108,17 +109,17 @@ def initialize():
 
 #create new element in database
 
-def create_new(ref, enc, n, price, status, url,  x, y, classID, half):
+def create_new(ref, enc, n, price, status, x, y, classID, half, img):
     ref.child(str(n)).set({
         'encoder' : enc,
         'id' : n,
         'price' : price,
         'status' : str(status),
-        'url' : url,
         'x' : x,
         'y' : y,
         'classID' : classID,
-        'half' : half
+        'half' : half,
+        'pic' : base64.encodestring(bytes(cv2.imencode('.png', img)[1])).decode('ascii'))    
     })    
 
 #update status of strawberry
@@ -392,7 +393,7 @@ while state != 6:
                     link = 'https://i.imgur.com/CQdaHBw.png'
 
                     # print(uploaded_image.link)
-                    create_new(ref, -berry['enc'], i+1, 100, 0, str(link), res['x'], res['y']/imHeight*height, res['classID'], berry['half'])
+                    create_new(ref, -berry['enc'], i+1, 100, 0, res['x'], res['y']/imHeight*height, res['classID'], berry['half'], berry['frame'])
 
                     print "created"
                     # create_new(ref, -berry['enc'], i+1, 100, 0, str(uploaded_image.link), int(berry['x']), berry['y']/imHeight*height)
@@ -400,7 +401,7 @@ while state != 6:
                     link = 'https://i.imgur.com/CQdaHBw.png'
                     notBerryCount += 1
                     # print(uploaded_image.link)
-                    create_new(ref, -berry['enc'], i+1, 100, 0, str(link), berry['x'], berry['y']/imHeight*height, -1, berry['half'])
+                    create_new(ref, -berry['enc'], i+1, 100, 0, berry['x'], berry['y']/imHeight*height, -1, berry['half'], berry['frame'])
 
                     print "created not berry"
             state = 3
