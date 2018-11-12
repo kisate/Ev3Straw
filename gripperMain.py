@@ -31,7 +31,7 @@ cameraEnc = 1800
 
 encToCm = 4.1/360
 
-deltaX1 = -2
+deltaX1 = -2    
 deltaY1 = -4
 
 deltaX2 = -2
@@ -42,8 +42,8 @@ lrServo = 5
 
 lastMessage = []
 
-host = '192.168.1.4'
-port = 51004 # random number
+host = '192.168.1.100'
+port = 51004 # fig number
 
 # code goes here ---------------
 
@@ -243,6 +243,8 @@ def getToPickPosition(x, y, pos, half):
 
     getToRotatingPosition(dx, dy)
 
+    moveCameraToPosition(half)
+
     angle = getRotAngle(dy)
 
     print(angle)
@@ -272,8 +274,7 @@ def collect(_x, _y, _pos, _half):
         if (half == 1 ) : rotateServo(lrServo, defaultAngle, 0.05)
         else : rotateServo(lrServo, defaultAngle2, 0.05)
         rotateServo(udServo, upAngle - 10)
-
-        moveCameraToPosition(half)
+        print("Half is ", half)
     
         rideToEnc(pos, 20)
 
@@ -332,18 +333,20 @@ def finish():
     servo.write_i2c_block_data(0x01, 0x48, [0xFF])
 
 def moveCameraToPosition(pos):
+
     if (pos == 1):
-        camera_motor.on(SpeedPercent(-50))
+        print("Move camera to start")
+        camera_motor.on(SpeedPercent(-20))
         while (camera_motor.position > 0):
             time.sleep(0.003)
     else:
-        camera_motor.on(SpeedPercent(50))
+        print("Move camera to ", cameraEnc)
+        camera_motor.on(SpeedPercent(20))
         while (camera_motor.position < cameraEnc):
             time.sleep(0.003)
     
     camera_motor.stop()
-            
-        
+
 class MessageHandler():
     def __init__(self):
         self.state = 0

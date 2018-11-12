@@ -11,14 +11,15 @@ import struct
 import os, glob, pickle
 import logging 
 import traceback
-#from getkey import getkey, keys
+from getkey import getkey, keys
 from time import sleep
 import tellopy
+from wireless import Wireless
 
 imHeight = 480
 height = 20.5
 
-host = '192.168.1.4'
+host = '192.168.1.3'
 port = 51004 # random number
 a = True
 
@@ -33,12 +34,14 @@ state = 1
 endPos = -10000
 
 first = -1
+notBerryCount = 0
 
 collected = 0 
 delivering = False
 switched = False
 readyToDeliver = False
-cameraId = 1
+readyToFly = False
+cameraId = 0
 
 pos = 0
 
@@ -60,8 +63,20 @@ allberries = []
 switch = 0
 lastid = -1
 
+def tello_handler(event, sender, data, **args):
+    drone = sender
+    
+    if event is drone.EVENT_FLIGHT_DATA:
+        print(data)
+        drone.down(0)
+        alt = int(str(data).split("=")[1].split(",")[0])
+        #print(alt)
+
 ########################################################33
 #check socket connetion
+drone = tellopy.Tello()
+drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
+drone.connect()
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -116,7 +131,7 @@ def update_status(ref, n, status):
 #change state of machine
 
 def handleMessage(message):
-    global pos, delivering, switched, readyToDeliver
+    global pos, delivering, switched, readyToDeliver, readyToFly
     if message[0] == 1:
         pos = message[1]
     if message[0] == 2:
@@ -125,6 +140,9 @@ def handleMessage(message):
         switched = True
     if message[0] == 4:
         readyToDeliver = True
+    if message[0] == 5:
+        readyToFly = True
+    
 
 def reader():
     global conn
@@ -151,16 +169,6 @@ def reader():
 
         handleMessage(message)
         if len(part) == 0 : break
-
-def tello_handler(event, sender, data, **args):
-    drone = sender
-    
-
-    if event is drone.EVENT_FLIGHT_DATA:
-        print(data)
-        alt = int(str(data).split("=")[1].split(",")[0])
-        print(alt)
-    
 
 #send to ev3
 
@@ -314,6 +322,7 @@ while state != 6:
 
             state = 2
         if state == 2:
+            cv2.namedWindow("output")
             ref = initialize()
             im = pyimgur.Imgur(CLIENT_ID)
 
@@ -324,11 +333,11 @@ while state != 6:
 
                 #cv2.imshow("image{}".format(i), frame)   
                 
+
                 cv2.imwrite("../photos/imgt.png", frame)
                 os.rename("../photos/imgt.png", "../photos/img.png")
-                
                 print i
-
+                  
                 response = glob.glob('../photos/classes.out')
                 while (len(response) == 0):
                     response = glob.glob('../photos/classes.out')
@@ -389,7 +398,7 @@ while state != 6:
                     # create_new(ref, -berry['enc'], i+1, 100, 0, str(uploaded_image.link), int(berry['x']), berry['y']/imHeight*height)
                 else :
                     link = 'https://i.imgur.com/CQdaHBw.png'
-
+                    notBerryCount += 1
                     # print(uploaded_image.link)
                     create_new(ref, -berry['enc'], i+1, 100, 0, str(link), berry['x'], berry['y']/imHeight*height, -1, berry['half'])
 
@@ -404,6 +413,10 @@ while state != 6:
             isc = False
         if state == 3:
             while(state != 4):
+                if cv2.waitKey(1) == ord('u'):
+                    state = 5
+                    send(7)
+                    break
                 new_stats[:] = []
                 ref = db.reference('/berrys')
                 for i in range(1, size):
@@ -414,7 +427,7 @@ while state != 6:
                     stats.append('')
 
                 for i in range(len(new_stats)):
-                    if not(int(new_stats[i]) == int(stats[i])):
+                    if not(stats[i] != None and new_stats[i] != None and int(new_stats[i]) == int(stats[i])):
                         #print("Found difference")
                         changed_id.append(i + 1)
                         changed_stats.append(new_stats[i])
@@ -457,9 +470,7 @@ while state != 6:
             
             print ("Trying")
 
-
             cap = cv2.VideoCapture(cameraId)
-
             
             while True:    
 
@@ -512,37 +523,34 @@ while state != 6:
             del q[0]
             state = 3 
         if state == 5:
-            drone = tellopy.Tello()
-            drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
-            drone.connect()
+            while not readyToFly:
+                sleep(0.03)
             while drone.connected:
-                key = getkey()
-                if key == 'u':
-                    drone.takeoff()
-                    drone.down(60)
-                    drone.right(15)
-                    sleep(4)
-                    drone.down(0)
-                    drone.right(0)
-                    sleep(1)
-                    drone.down(40)
-                    sleep(3)
-                    drone.down(0)
-                    sleep(2)
-                    drone.forward(20)
-                    sleep(3)
-                    drone.forward(0)
-                    sleep(1)
-                    drone.right(20)
-                    sleep(4)
-                    drone.right(0)
-                    sleep(3)
-                    drone.down(50)
-                    drone.land()
-                    sleep(5)
-                    drone.quit()
-                    break
-            state == 6
+                drone.takeoff()
+                drone.down(60)
+                drone.right(15)
+                sleep(4)
+                drone.down(0)
+                drone.right(0)
+                sleep(1)
+                drone.down(20)
+                sleep(3)
+                drone.down(0)
+                sleep(2)
+                drone.forward(20)
+                sleep(3)
+                drone.forward(0)
+                sleep(1)
+                drone.right(20)
+                sleep(4)
+                drone.right(0)
+                sleep(3)
+                drone.down(50)
+                drone.land()
+                sleep(5)
+                drone.quit()
+                break
+            state == 3
     except BaseException as e:
         traceback.print_exc()
         cap.release()
