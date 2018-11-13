@@ -6,7 +6,7 @@ import smbus
 
 servoAddresses = [0x42, 0x43, 0x44, 0x45, 0x46, 0x47]
 
-downAngle = 50
+downAngle = 55
 upAngle = 10
 defaultAngle = 130
 
@@ -45,48 +45,75 @@ def rotateServo(channel_id, position, step = 0.1):
 
         time.sleep(step)
 
+def getToPickPosition(x, y, pos, half):
+    if (half == 1 ) : rotateServo(lrServo, defaultAngle, 0.05)
+    else : rotateServo(lrServo, defaultAngle2, 0.05)
+    rotateServo(udServo, upAngle)
+    
+    print (pos)
+
+    rideToEnc(pos)
+    
+    moving_motor.stop()
+
+
+    if (half == 1):
+        dx = (imWidth - x)/imWidth*width + deltaX1
+        dy = y/imHeight*height + deltaY1
+
+    else:
+        dx = (imWidth - x)/imWidth*width + deltaX2
+        dy = -((imHeight - y)/imHeight*height + deltaY2)
+
+
+    getToRotatingPosition(dx, dy)
+
+    angle = getRotAngle(dy)
+
+    print(angle)
+
+    rotateServo(lrServo, angle)
+
+
+
 
 m = LargeMotor(OUTPUT_B)
 
 rotateServo(lrServo, 50)
 
+
+
 rotateServo(udServo, upAngle)
 
 m.on(SpeedPercent(-100))
 
-#time.sleep(0.1)
+time.sleep(0.4)
 
 
 rotateServo(udServo, downAngle, 0.01)
 
+m.reset()
+
+time.sleep(1)
+
 m.on(SpeedPercent(100))
 
-time.sleep(1.5)
+time.sleep(1)
 
 m.reset()
-time.sleep(0.1)
-
-m.on(SpeedPercent(100))
-
-time.sleep(0.8)
 
 rotateServo(udServo, upAngle - 10)
 
-m.reset()
-
-time.sleep(0.5)
-
 counter = 0
-
-
 
 try :
 
     while True:
-        m.reset()
-        time.sleep(0.1)
         m.on(SpeedPercent(100))
-        time.sleep(0.25)
+        time.sleep(0.15)    
+        m.reset()
+        time.sleep(1.2)
+       
         counter+=1
         # if counter == 5:
         #     rotateServo(udServo, downAngle-10)

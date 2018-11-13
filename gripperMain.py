@@ -6,7 +6,7 @@ import time
 
 from math import acos, pi
 
-from ev3dev2.motor import LargeMotor, OUTPUT_B, SpeedPercent, MoveTank, OUTPUT_A, OUTPUT_C, MediumMotor
+from ev3dev2.motor import LargeMotor, OUTPUT_B, SpeedPercent, MoveTank, OUTPUT_A, OUTPUT_C, MediumMotor, OUTPUT_D
 from ev3dev2.sensor import INPUT_2
 from ev3dev2.sensor.lego import TouchSensor
 
@@ -23,9 +23,9 @@ height = 26
 length = 19
 
 downAngle = 50
-upAngle = 10
-defaultAngle = 130
-defaultAngle2 = 50
+upAngle = 20
+defaultAngle = 160
+defaultAngle2 = 20
 
 cameraEnc = 1800
 
@@ -42,7 +42,7 @@ lrServo = 5
 
 lastMessage = []
 
-host = '192.168.1.100'
+host = '192.168.1.3'
 port = 51004 # fig number
 
 # code goes here ---------------
@@ -53,19 +53,37 @@ servo.write_i2c_block_data(0x01, 0x48, [0xAA]) # xAA - disable 10 second timeout
 moving_motor = LargeMotor(OUTPUT_A)
 pump_motor = LargeMotor(OUTPUT_B)
 camera_motor = MediumMotor(OUTPUT_C)
+drone_motor = LargeMotor(OUTPUT_D)
 
 touch = TouchSensor(INPUT_2)
 
 client = Client(host, port)
 
-def getServoPos(channel_id):
+def moveDroneToStartPos():
 
+    drone_motor.on(SpeedPercent(-40))
+    while (drone_motor.position > -1300):
+        print(drone_motor.position)
+        time.sleep(0.003)
+ 
+    drone_motor.stop()
+
+def moveDroneToGetPos():
+
+    drone_motor.on(SpeedPercent(40))
+    while (drone_motor.position < 550):
+        print(drone_motor.position)
+        time.sleep(0.003)
+ 
+    drone_motor.stop()
+
+def getServoPos(channel_id):
     return servo.read_i2c_block_data(0x01, servoAddresses[channel_id])[0]
 
 def setServoPos(channel_id, position):
     servo.write_i2c_block_data(0x01, servoAddresses[channel_id], [position % 256])
 
-def rotateServo(channel_id, position, step = 0.02):
+def rotateServo(channel_id, position, step = 0.05):
 
     position %= 256
 
@@ -100,10 +118,10 @@ class SupportThread(Thread):
     
     def run(self) :           
         while not self.exit.is_set():
-            pump_motor.reset()
-            self.exit.wait(0.1)
             pump_motor.on(SpeedPercent(100))
-            self.exit.wait(0.25)
+            self.exit.wait(0.15)
+            pump_motor.reset()
+            self.exit.wait(1.2)
         
         pump_motor.reset()
 
@@ -114,7 +132,33 @@ class SupportThread(Thread):
 support_thread = SupportThread('support')
 
 def deliver():
+    getToPickPosition(178, 41, -10953, 2)
+    '''
     target = -10000
+
+    moving_motor.on(SpeedPercent(-100))
+    
+    while (moving_motor.position > target - 953):
+        client.send(1, moving_motor.position)
+
+    moving_motor.stop()
+    '''
+
+    rotateServo(udServo, downAngle - 20)
+    
+    support_thread.stop()
+
+    pump_motor.on(SpeedPercent(-100))
+    time.sleep(2)
+
+    rotateServo(udServo, upAngle - 10)
+
+    pump_motor.reset()
+
+    client.send(2)
+
+def deliverToDrone():
+    target = -10800
 
     moving_motor.on(SpeedPercent(-100))
     
@@ -136,39 +180,37 @@ def deliver():
 
     client.send(2)
 
-    
-
 def pick():
 
     global support_thread
 
     pump_motor.on(SpeedPercent(-100))
 
-    rotateServo(udServo, downAngle, 0.01)
+    time.sleep(0.2)
 
-    pump_motor.on(SpeedPercent(100))
-
-    time.sleep(1.5)
-
-    pump_motor.reset()
-    time.sleep(0.1)
-
-    pump_motor.on(SpeedPercent(100))
-
-    time.sleep(0.1)
-
-    rotateServo(udServo, upAngle, 0.1)
+    rotateServo(udServo, downAngle, 0.02)
 
     pump_motor.reset()
 
-    time.sleep(0.4)
+    time.sleep(1)
+
+    pump_motor.on(SpeedPercent(100))
+
+    time.sleep(1)
+
+    pump_motor.reset()
+
+    time.sleep(1)
+
+    rotateServo(udServo, upAngle - 10)
 
     support_thread = SupportThread('support')
-    support_thread.start()
 
-    time.sleep(2)
+    #time.sleep(2)
 
     rotateServo(udServo, upAngle)
+    
+    support_thread.start()
 
     #support_thread.stop()
 
@@ -285,12 +327,13 @@ def collect(_x, _y, _pos, _half):
         while (messagehandler.state == 0):
             time.sleep(0.001)
 
-        
         if (messagehandler.state == 5):
             message = messagehandler.message
             x, y, pos, half = message[1], message[2], message[3], message[4]
             messagehandler.state = 0
             support_thread.stop()
+            pump_motor.on(SpeedPercent(-100))
+            time.sleep(0.5)
             print ("Not picked")
 
         elif (messagehandler.state == 6):
@@ -302,7 +345,7 @@ def collect(_x, _y, _pos, _half):
             break
     
     deliver()
-
+    #client.send(2)
     #support_thread.stop()
 
     pump_motor.on(SpeedPercent(-100))
@@ -338,7 +381,7 @@ def moveCameraToPosition(pos):
         print("Move camera to start")
         camera_motor.on(SpeedPercent(-20))
         while (camera_motor.position > 0):
-            time.sleep(0.003)
+            time.sleep(0.003) 
     else:
         print("Move camera to ", cameraEnc)
         camera_motor.on(SpeedPercent(20))
@@ -362,10 +405,17 @@ messagehandler = MessageHandler()
 def waitForCommand():
 
     while True:
-        try : 
+        try :
+            if (messagehandler.state == 7):
+                print("Ready")
+                drone_motor.on(SpeedPercent(-40))
+                while (drone_motor.position > -1300):
+                    print(drone_motor.position)
+                    time.sleep(0.003)
+                drone_motor.stop()
             if (messagehandler.state == 0):
                 time.sleep(0.005)
-        
+
             if (messagehandler.state == 1):
                 message = messagehandler.message
                 print(message)
@@ -437,11 +487,11 @@ def waitForCommand():
             print (e)
             break
 
-
 rotateServo(lrServo, defaultAngle)
 rotateServo(udServo, upAngle)
 
-rotateServoOnDefault()
+#rotateServoOnDefault()
+time.sleep(5)
 
 calibrate()
 

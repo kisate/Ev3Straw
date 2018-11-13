@@ -31,6 +31,7 @@ CLIENT_ID = "733b83d64f87370"
 
 state = 1
 
+#endPos = -10000
 endPos = -10000
 
 first = -1
@@ -41,7 +42,7 @@ delivering = False
 switched = False
 readyToDeliver = False
 readyToFly = False
-cameraId = 0
+cameraId = 1
 
 pos = 0
 
@@ -63,6 +64,8 @@ allberries = []
 switch = 0
 lastid = -1
 
+wireless = Wireless()
+
 def tello_handler(event, sender, data, **args):
     drone = sender
     
@@ -74,9 +77,9 @@ def tello_handler(event, sender, data, **args):
 
 ########################################################33
 #check socket connetion
-drone = tellopy.Tello()
-drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
-drone.connect()
+# drone = tellopy.Tello()
+# drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
+# drone.connect()
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -414,8 +417,10 @@ while state != 6:
         if state == 3:
             while(state != 4):
                 if cv2.waitKey(1) == ord('u'):
-                    state = 5
                     send(7)
+                    if wireless.current() != 'TELLO-AA1A76':
+                        wireless.connect(ssid = 'TELLO-AA1A76', password = '')
+                    state = 5
                     break
                 new_stats[:] = []
                 ref = db.reference('/berrys')
@@ -521,36 +526,42 @@ while state != 6:
             while delivering:
                 time.sleep(0.003)
             del q[0]
+#             send(7)
+#             if wireless.current() != 'TELLO-AA1A76':
+#                 wireless.connect(ssid = 'TELLO-AA1A76', password = '')
+#             state = 5
             state = 3 
         if state == 5:
-            while not readyToFly:
-                sleep(0.03)
-            while drone.connected:
-                drone.takeoff()
-                drone.down(60)
-                drone.right(15)
-                sleep(4)
-                drone.down(0)
-                drone.right(0)
-                sleep(1)
-                drone.down(20)
-                sleep(3)
-                drone.down(0)
-                sleep(2)
-                drone.forward(20)
-                sleep(3)
-                drone.forward(0)
-                sleep(1)
-                drone.right(20)
-                sleep(4)
-                drone.right(0)
-                sleep(3)
-                drone.down(50)
-                drone.land()
-                sleep(5)
-                drone.quit()
-                break
-            state == 3
+            print('Waiting for drone...')
+            # while not readyToFly:
+            #     sleep(0.03)
+            # while drone.connected:
+            #     drone.takeoff()
+            #     drone.down(60)
+            #     drone.right(15)
+            #     sleep(4)
+            #     drone.down(0)
+            #     drone.right(0)
+            #     sleep(1)
+            #     drone.down(30)
+            #     sleep(3)
+            #     drone.down(0)
+            #     sleep(2)
+            #     drone.forward(30)
+            #     sleep(3)
+            #     drone.forward(0)
+            #     sleep(1)
+            #     drone.right(20)
+            #     sleep(2)
+            #     drone.right(0)
+            #     sleep(3)
+            #     drone.down(50)
+            #     drone.land()
+            #     sleep(5)
+            #     drone.quit()
+            #     break
+            print("Finished")
+            state == 6
     except BaseException as e:
         traceback.print_exc()
         cap.release()
