@@ -188,16 +188,13 @@ def deliver(i):
         mask = cv2.inRange(hsv, low1, high1)
         mask += cv2.inRange(hsv, low2, high2)    
         #mask += cv2.inRange(hsv, low3, high3)
-        print ("BLYAT")
         cv2.bitwise_and(hsv, hsv, mask = mask)
         connectivity = 7
         output = cv2.connectedComponentsWithStats(mask, connectivity, cv2.CV_32S)
-        print ("GOVNO")
         num_labels = output[0]
         labels = output[1]
         stats = output[2]
         centroids = output[3]
-        print ("EBAL")
         print(frame)
         picked = True
 
