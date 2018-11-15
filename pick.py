@@ -45,38 +45,6 @@ def rotateServo(channel_id, position, step = 0.1):
 
         time.sleep(step)
 
-def getToPickPosition(x, y, pos, half):
-    if (half == 1 ) : rotateServo(lrServo, defaultAngle, 0.05)
-    else : rotateServo(lrServo, defaultAngle2, 0.05)
-    rotateServo(udServo, upAngle)
-    
-    print (pos)
-
-    rideToEnc(pos)
-    
-    moving_motor.stop()
-
-
-    if (half == 1):
-        dx = (imWidth - x)/imWidth*width + deltaX1
-        dy = y/imHeight*height + deltaY1
-
-    else:
-        dx = (imWidth - x)/imWidth*width + deltaX2
-        dy = -((imHeight - y)/imHeight*height + deltaY2)
-
-
-    getToRotatingPosition(dx, dy)
-
-    angle = getRotAngle(dy)
-
-    print(angle)
-
-    rotateServo(lrServo, angle)
-
-
-
-
 m = LargeMotor(OUTPUT_B)
 
 
@@ -98,7 +66,7 @@ time.sleep(1)
 
 m.on(SpeedPercent(100))
 
-time.sleep(1)
+time.sleep(1.4)
 
 m.reset()
 
@@ -110,9 +78,9 @@ try :
 
     while True:
         m.on(SpeedPercent(100))
-        time.sleep(0.1)    
+        time.sleep(0.15)    
         m.reset()
-        time.sleep(1.2)
+        time.sleep(0.8)
        
         counter+=1
         # if counter == 5:

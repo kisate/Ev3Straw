@@ -21,7 +21,7 @@ class Client():
                 part = s.recv(8)
                 message.append(int.from_bytes(part, byteorder='big', signed=True))
 
-            #print (message)
+            print (message)
             
             self.messageHandler.updateMessage(message)
             
@@ -43,6 +43,8 @@ class Client():
 
             for a in args:
                 msg += (a).to_bytes(8, byteorder='big', signed = True)
+
+            print(msg)
 
             self.socket.send(msg)
 

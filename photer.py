@@ -1,12 +1,15 @@
 import cv2
 
-cap = cv2.VideoCapture(2)
+cap = cv2.VideoCapture(1)
 
 counter = 0
 
 while True:
     _, frame = cap.read()
-    cv2.imshow('photer', frame)
+
+    cropped = frame[:, :-90]
+
+    cv2.imshow('photer', cropped)
 
     k = cv2.waitKey(1)
 

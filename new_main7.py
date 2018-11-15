@@ -1,3 +1,6 @@
+
+
+
 import cv2 
 import numpy as npy
 import socket 
@@ -15,14 +18,15 @@ from getkey import getkey, keys
 from time import sleep
 import tellopy
 from wireless import Wireless
-import base64
+from google.cloud import storage
+from google.oauth2 import service_account
 
 imHeight = 480
 height = 20.5
 
 host = '192.168.1.3'
-port = 51004 # random number
-a = True
+port = 51100 # random number
+a = False
 
 q = []
 
@@ -43,9 +47,12 @@ delivering = False
 switched = False
 readyToDeliver = False
 readyToFly = False
-cameraId = 0
-
+droneLeft = True
+cameraId = 1
 pos = 0
+
+cameraOffset1 = 85
+cameraOffset2 = 90
 
 cv2.namedWindow('image')
 
@@ -79,9 +86,9 @@ def tello_handler(event, sender, data, **args):
 ########################################################33
 #check socket connetion
 
-drone = tellopy.Tello()
-drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
-drone.connect()
+# drone = tellopy.Tello()
+# drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
+# drone.connect()
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -109,11 +116,11 @@ def initialize():
             'uid': 'firebase-adminsdk-z6zvt@strawberryfinder.iam.gserviceaccount.com'
         }
     })
-    return db.reference('/berrys')
+    return db.reference('/berries')
 
 #create new element in database
 
-def create_new(ref, enc, n, price, status, x, y, classID, half, img):
+def create_new(ref, enc, n, price, status, x, y, classID, half, imagePath):
     ref.child(str(n)).set({
         'encoder' : enc,
         'id' : n,
@@ -123,7 +130,7 @@ def create_new(ref, enc, n, price, status, x, y, classID, half, img):
         'y' : y,
         'classID' : classID,
         'half' : half,
-        'pic' : base64.encodestring(bytearray(cv2.imencode('.png', img)[1])).decode('ascii')   
+        'imagePath' : imagePath 
     })    
 
 #update status of strawberry
@@ -157,18 +164,20 @@ def reader():
 
         part = conn.recv(1)
         
+        print(part)
+
         if (len(part) == 0):
             conn.close()
             break
 
         message_size = struct.unpack('>b', part)[0]
 
-        #print "{} {}".format(part, struct.unpack('>b', part))
+        print "{} {}".format(part, struct.unpack('>b', part))
 
         for i in range(message_size):
             part = conn.recv(8)
             
-            #print "{} {}".format(part, struct.unpack('>q', part))
+            print "{} {}".format(part, struct.unpack('>q', part))
             message.append(struct.unpack('>q', part)[0])
             #message.append(int.from_bytes(part, byteorder='big', signed=True))
 
@@ -205,6 +214,8 @@ while state != 6:
                 # Capture frame-by-frame    
                 ret, frame = cap.read()
                 
+                frame = frame[:, cameraOffset1:]
+
                 hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
                 
                 mask = cv2.inRange(hsv, low1, high1)
@@ -228,10 +239,9 @@ while state != 6:
                         sx = hex(x)[2:].zfill(4) 
                         sy = hex(y)[2:].zfill(4) 
 
-                        croped = frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]   
+                        # croped = frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]   
                         #cv2.rectangle(frame,(x,y),(x+w,y+h),(0,0,255),3)    
                         
-                        frame2 = frame.copy()
                         
                         cv2.circle(frame,(int(centroids[i][0]), int(centroids[i][1])), 10, (0,255,0), -1)
 
@@ -247,14 +257,14 @@ while state != 6:
                             lastid+=1
                             berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid})
 
-                            allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame2, 'half' : 1})
+                            allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame, 'half' : 1})
 
                             #allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]})
                             #allberries.append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid, 'enc' : 311})
                         else :
                             berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : b})
 
-                print(pos)
+                # print(pos)
                 switch=(switch + 1)%2
                 cv2.imshow('image', frame)
                 
@@ -271,6 +281,8 @@ while state != 6:
                 # Capture frame-by-frame    
                 ret, frame = cap.read()
                 
+                frame = frame[:, :-cameraOffset2]
+
                 hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
                 
                 mask = cv2.inRange(hsv, low1, high1)
@@ -294,7 +306,7 @@ while state != 6:
                         sx = hex(x)[2:].zfill(4) 
                         sy = hex(y)[2:].zfill(4) 
 
-                        croped = frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]   
+                        # croped = frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]   
                         #cv2.rectangle(frame,(x,y),(x+w,y+h),(0,0,255),3)    
                         cv2.circle(frame,(int(centroids[i][0]), int(centroids[i][1])), 10, (0,255,0), -1)
 
@@ -331,11 +343,16 @@ while state != 6:
 
             state = 2
         if state == 2:
-            cv2.namedWindow("output")
+            
             ref = initialize()
-            im = pyimgur.Imgur(CLIENT_ID)
+            sc = storage.Client()
+            bucket = sc.get_bucket('strawberryfinder.appspot.com')
+            
+            db.reference('/berries').delete()
+            
+            cv2.namedWindow("output")
 
-            db.reference('/berrys').delete()
+            
             for i, berry in enumerate(allberries):
                 
                 frame = berry['frame']
@@ -369,8 +386,8 @@ while state != 6:
                         box = boxes[0][index]
                         classID = int(classes[0][index])
 
-                        coef1 = 0.75
-                        coef2 = 0.75
+                        coef1 = 1
+                        coef2 = 0.9
 
                         pointA, pointB = (min(int(box[1]*width), int(box[3]*width)), min(int(box[0]*width*coef1), int(box[2]*width*coef1))), (max(int(box[1]*width), int(box[3]*width)), max(int(box[0]*width*coef2), int(box[2]*width*coef2)))
                         cv2.rectangle(frame, pointA, pointB, colormap[classID-1], 4)
@@ -386,6 +403,7 @@ while state != 6:
                         if (pointA[0] < berry['y'] < pointB[0] and pointA[1] < berry['x'] < pointB[1]):
                             res = {'classID' : classID, 'x' : int((pointA[1] + pointB[1]) / 2), 'y' : int((pointA[0] + pointB[0]) / 2)}
                             # res = {'classID' : classID, 'x' : berry['x'], 'y' : berry['y']}
+
                             print "yep{}".format(index)
 
                 #cv2.imshow("image{}".format(i), frame)
@@ -401,15 +419,22 @@ while state != 6:
                     link = 'https://i.imgur.com/CQdaHBw.png'
 
                     # print(uploaded_image.link)
-                    create_new(ref, -berry['enc'], i+1, 100, 0, res['x'], berry['y'], res['classID'], berry['half'], berry['frame'])
+                   
+                    blob2 = bucket.blob('images/image{}.png'.format(i+1))
 
+                    cv2.imwrite('tmp.png', berry['frame'])
+                    blob2.upload_from_filename(filename='./tmp.png')
+                    
+                    os.remove('tmp.png') 
+                    create_new(ref, -berry['enc'], i+1, 100, 0, res['x'], res['y'], res['classID'], berry['half'], 'image{}.png'.format(i+1))
+                    
                     print "created"
                     # create_new(ref, -berry['enc'], i+1, 100, 0, str(uploaded_image.link), int(berry['x']), berry['y']/imHeight*height)
                 else :
                     link = 'https://i.imgur.com/CQdaHBw.png'
                     notBerryCount += 1
                     # print(uploaded_image.link)
-                    create_new(ref, -berry['enc'], i+1, 100, 0, berry['x'], berry['y'], -1, berry['half'], berry['frame'])
+                    create_new(ref, -berry['enc'], i+1, 100, 0, berry['x'], berry['y'], -1, berry['half'], 'qmark.jpg')
 
                     print "created not berry"
             state = 3
@@ -429,7 +454,7 @@ while state != 6:
                     state = 5
                     break
                 new_stats[:] = []
-                ref = db.reference('/berrys')
+                ref = db.reference('/berries')
                 for i in range(1, size):
                         new_stats.append(ref.child(str(i)).child('status').get())
                 print("new status", new_stats)
@@ -500,6 +525,11 @@ while state != 6:
                     time.sleep(0.01)
                     cap_read_retries+=1
 
+                if berry['half'] == 1:
+                    frame = frame[:, cameraOffset1:]
+                elif berry['half'] == 2:
+                    frame = frame[:, :-cameraOffset2]
+
                 hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
 
                 mask = cv2.inRange(hsv, low1, high1)
@@ -534,13 +564,13 @@ while state != 6:
             while delivering:
                 time.sleep(0.003)
             del q[0]
-            send(7)
-            if wireless.current() != 'TELLO-AA1A76':
-                wireless.connect(ssid = 'TELLO-AA1A76', password = '')
-            state = 5 
+            # send(7)
+            if not droneLeft : state = 5
+            else : state = 3
         if state == 5:
             print('Waiting for drone...')
-
+            while wireless.current() != 'TELLO-AA1A76':
+                wireless.connect(ssid = 'TELLO-AA1A76', password = '')
             send(7)
 
             time.sleep(4)
@@ -567,13 +597,15 @@ while state != 6:
                 sleep(2)
                 drone.right(0)
                 sleep(3)
-                drone.down(50)
+                # drone.down(50)
                 drone.land()
                 sleep(5)
                 drone.quit()
                 break
             print("Finished")
+            droneLeft = True
             state = 3
+
     except BaseException as e:
         traceback.print_exc()
         cap.release()
