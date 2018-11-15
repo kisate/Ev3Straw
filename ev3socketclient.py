@@ -37,12 +37,17 @@ class Client():
 
     def send(self, *args):
         
-        msg = len(args).to_bytes(1, byteorder='big')
+        try : 
 
-        for a in args:
-            msg += (a).to_bytes(8, byteorder='big', signed = True)
+            msg = len(args).to_bytes(1, byteorder='big')
 
-        self.socket.send(msg)
+            for a in args:
+                msg += (a).to_bytes(8, byteorder='big', signed = True)
+
+            self.socket.send(msg)
+
+        except BaseException as e :
+            print (e)
 
     def disconnect(self):
         self.on = False

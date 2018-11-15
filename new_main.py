@@ -32,8 +32,8 @@ CLIENT_ID = "733b83d64f87370"
 
 state = 1
 
-#endPos = -10000
 endPos = -10000
+# endPos = -10900
 
 first = -1
 notBerryCount = 0
@@ -43,7 +43,7 @@ delivering = False
 switched = False
 readyToDeliver = False
 readyToFly = False
-cameraId = 1
+cameraId = 0
 
 pos = 0
 
@@ -78,9 +78,10 @@ def tello_handler(event, sender, data, **args):
 
 ########################################################33
 #check socket connetion
-# drone = tellopy.Tello()
-# drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
-# drone.connect()
+
+drone = tellopy.Tello()
+drone.subscribe(drone.EVENT_FLIGHT_DATA, tello_handler)
+drone.connect()
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -122,7 +123,7 @@ def create_new(ref, enc, n, price, status, x, y, classID, half, img):
         'y' : y,
         'classID' : classID,
         'half' : half,
-        'pic' : base64.encodestring(bytes(cv2.imencode('.png', img)[1])).decode('ascii'))    
+        'pic' : base64.encodestring(bytearray(cv2.imencode('.png', img)[1])).decode('ascii')   
     })    
 
 #update status of strawberry
@@ -196,6 +197,7 @@ threading.Thread(target=reader, args=()).start()
 while state != 6:
     try : 
         if state == 1:
+            
             cap = cv2.VideoCapture(cameraId)
             send(3, endPos)
 
@@ -228,6 +230,9 @@ while state != 6:
 
                         croped = frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]   
                         #cv2.rectangle(frame,(x,y),(x+w,y+h),(0,0,255),3)    
+                        
+                        frame2 = frame.copy()
+                        
                         cv2.circle(frame,(int(centroids[i][0]), int(centroids[i][1])), 10, (0,255,0), -1)
 
                         a = 2500
@@ -242,7 +247,7 @@ while state != 6:
                             lastid+=1
                             berries[(switch + 1)%2].append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid})
 
-                            allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame, 'half' : 1})
+                            allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame2, 'half' : 1})
 
                             #allberries.append({'x' : centroids[i][1], 'y' : centroids[i][0], 'id' : lastid, 'enc' : pos, 'frame' : frame[max(int(centroids[i][1] - 200), 0):int(centroids[i][1])+200, max(int(centroids[i][0]) - 200, 0):int(centroids[i][0])+200]})
                             #allberries.append({'x' : centroids[i][0], 'y' : centroids[i][1], 'id' : lastid, 'enc' : 311})
@@ -396,7 +401,7 @@ while state != 6:
                     link = 'https://i.imgur.com/CQdaHBw.png'
 
                     # print(uploaded_image.link)
-                    create_new(ref, -berry['enc'], i+1, 100, 0, res['x'], res['y']/imHeight*height, res['classID'], berry['half'], berry['frame'])
+                    create_new(ref, -berry['enc'], i+1, 100, 0, res['x'], berry['y'], res['classID'], berry['half'], berry['frame'])
 
                     print "created"
                     # create_new(ref, -berry['enc'], i+1, 100, 0, str(uploaded_image.link), int(berry['x']), berry['y']/imHeight*height)
@@ -404,7 +409,7 @@ while state != 6:
                     link = 'https://i.imgur.com/CQdaHBw.png'
                     notBerryCount += 1
                     # print(uploaded_image.link)
-                    create_new(ref, -berry['enc'], i+1, 100, 0, berry['x'], berry['y']/imHeight*height, -1, berry['half'], berry['frame'])
+                    create_new(ref, -berry['enc'], i+1, 100, 0, berry['x'], berry['y'], -1, berry['half'], berry['frame'])
 
                     print "created not berry"
             state = 3
@@ -473,6 +478,8 @@ while state != 6:
             print(berry)
 
             send(1, berry['x'], berry['y'], berry['enc'], berry['half'])
+
+            # print ("{} {} {} {}".format(berry['x'], berry['y'], berry['enc'], berry['half']))
             
             print ("Trying")
 
@@ -527,44 +534,49 @@ while state != 6:
             while delivering:
                 time.sleep(0.003)
             del q[0]
-#             send(7)
-#             if wireless.current() != 'TELLO-AA1A76':
-#                 wireless.connect(ssid = 'TELLO-AA1A76', password = '')
-#             state = 5
-            state = 3 
+            send(7)
+            if wireless.current() != 'TELLO-AA1A76':
+                wireless.connect(ssid = 'TELLO-AA1A76', password = '')
+            state = 5 
         if state == 5:
             print('Waiting for drone...')
-            # while not readyToFly:
-            #     sleep(0.03)
-            # while drone.connected:
-            #     drone.takeoff()
-            #     drone.down(60)
-            #     drone.right(15)
-            #     sleep(4)
-            #     drone.down(0)
-            #     drone.right(0)
-            #     sleep(1)
-            #     drone.down(30)
-            #     sleep(3)
-            #     drone.down(0)
-            #     sleep(2)
-            #     drone.forward(30)
-            #     sleep(3)
-            #     drone.forward(0)
-            #     sleep(1)
-            #     drone.right(20)
-            #     sleep(2)
-            #     drone.right(0)
-            #     sleep(3)
-            #     drone.down(50)
-            #     drone.land()
-            #     sleep(5)
-            #     drone.quit()
-            #     break
+
+            send(7)
+
+            time.sleep(4)
+
+            while not readyToFly:
+                sleep(0.03)
+            while drone.connected:
+                drone.takeoff()
+                drone.down(60)
+                drone.right(15)
+                sleep(4)
+                drone.down(0)
+                drone.right(0)
+                sleep(1)
+                drone.down(30)
+                sleep(3)
+                drone.down(0)
+                sleep(2)
+                drone.forward(30)
+                sleep(3)
+                drone.forward(0)
+                sleep(1)
+                drone.right(20)
+                sleep(2)
+                drone.right(0)
+                sleep(3)
+                drone.down(50)
+                drone.land()
+                sleep(5)
+                drone.quit()
+                break
             print("Finished")
-            state == 6
+            state = 3
     except BaseException as e:
         traceback.print_exc()
         cap.release()
         conn.close()
+        drone.quit()
         exit()

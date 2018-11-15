@@ -25,12 +25,14 @@ def setPic(ref, n, pic):
         base64.encodestring(pic).decode('ascii'))    
 
 
-retval, buffer = cv2.imencode('.png', cv2.imread('b0.png'))
+retval, buffer = cv2.imencode('.png', cv2.imread('e000.png'))
+
+print(bytearray(buffer))
 
 ref = initialize()
 
 for i in range(1, 11):
-    setPic(ref, i, bytes(buffer))
+    setPic(ref, i, bytearray(buffer))
 
 for i in range(1, 11):
     pic = binascii.a2b_base64(ref.child(str(i)).child('pic').get())
