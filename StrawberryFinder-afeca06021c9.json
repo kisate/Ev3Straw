@@ -1,0 +1,12 @@
+{
+  "type": "service_account",
+  "project_id": "strawberryfinder",
+  "private_key_id": "afeca06021c91389a6eaf0a39293957480984383",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCp0mIc12tXSFro\n6HHglMeTaQAoWI5n82+I5ZpKhXDst/G40qr7iPfmotwrzjEE7bIxOK5RE9gDiqNy\npvabdKZ+w0SExPkylxSagu97Giit/t7O46rsgdyePAQbV3FR04PE58TMNkVsjffk\n4Zr/j2XX8WyOUeoqLx2JuOtiuh8zDdhIkVBpIvKhDsKoCGRjvi5s82QK8In0a3xR\n9Y/siI/AqTCI8nL4DgUAhtD71hiLYFA84Oq8Xie7cMDxm9lAgdY+xhQp9sCZCYkF\noZqXKTTujGwBM8QEEqivhlFSfzkGJ7RJMVi0KXi3AVkAruZv0kI+7UreBCBxmsId\nVlKewzvDAgMBAAECggEAJ3fpbJmWbX03/7ySRuddMQHs0vOt+TPnPrJaNyqnUaT4\nrYNs0LQHJZfBQv8Tfnk9+lmZjedmQ4Bzt2BdnUixr3FzmcXrwtnBJJ38yagNP08m\neoAISBpwa2g4biBXCnT1wYw6PVn5rZ6bOBtE+lNaEKOgHr2kBjTYERukvVfTi3ox\nuB8EKTmOyhnDh62AW9D8rcD+UTPBVpuh+QBUO85YxqBFq1cZ4NqXf+gMC4qmw+9t\n4hb1saNhETcuebaIIm2kkLKrpoB/9oQmnfvX0n77E++16OBPPzKKEnZaUzAOpTj2\nIPqv7ySNMWyoiSp9Fq6ovyh9YB16zy1oJrjGzZA+8QKBgQDbbNTwqpGnRKFaiFMa\nOboiYXe2GVhFDpbYjXVRTx9g30T4PrF49N0jlMxAFzAxotGEocIJU6xvTStFDV7L\n/AA+Ia/3nj0RgPV+WzCVpz0AZ4uqeCRX2ZPhATDEMOywK3AZPSIH/TP8BBd8LNPx\nd0sdOboDDFFd4WzL8zMgNsm1EwKBgQDGIOkeXlNPFMkUbtpkImnBoGjUM8OJ7XQF\nkR21PyvPW1PT7GwzhPGPxWc4Mx4vvcWIAbtPN7dywS1yQ0RF6s0Xs0fWn+iI6oMI\n36D3HazmO2hKmOW9CLmABe0y0QrV4J1hYeGAB688RumYJ+7rcC7h5Sc80SeL79nv\nvfeSvV8kkQKBgGHTOXQ6d0ldfZpBINuWVPezAI386q+O+418M4uWfOTRZYxPVwwY\nDucoFY+VRvU6I7K/8yP5W+0bOGlGtra2mN0aY7s/nvZIyioVOaner4GYqFnNylYo\nOJed0kIFleBM3WNDMALjzeNTZ60Cx1Ll3mUfMWDegwAZ2klrGaYJBxBlAoGADINJ\nlcRpSIZMiMDThB10RmlGFZjLUauwdyWKFcdOkgL3kVvOHZbY1ral5TO9RVCb6BIL\n7V3cdR/kKeI7rpq8pzGIaPKicfs1mVreRJ0YLVY1KPjtEXo6lO5K47m2EHnmFp9i\n6X4SwCDOYfCrsyzbmSKqzrl64Oid//kkaJ0TJDECgYEAw8RwHo0xsr6gZxwIdqNS\n0xDxFVHKKxcb6D+J47wK0MXCvNjYS26TtKcTr3IV8c5JIomvfmwC/PQBPW9q56Ds\n6dAsLfr5jSyxluUr2NggmjbLCGF/S8jxxBwE8WQWPkGedZxCqUqyHdvYVv8lyJx9\nqy6K7MvfoZWxOhZQ/+gnKIs=\n-----END PRIVATE KEY-----\n",
+  "client_email": "firebase-adminsdk-z6zvt@strawberryfinder.iam.gserviceaccount.com",
+  "client_id": "117319285207587242666",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/firebase-adminsdk-z6zvt%40strawberryfinder.iam.gserviceaccount.com"
+}
