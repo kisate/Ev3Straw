@@ -1,7 +1,3 @@
-import sys
-
-sys.path.remove('/opt/ros/kinetic/lib/python2.7/dist-packages')
-
 
 import cv2
 import glob, os
@@ -11,7 +7,7 @@ import pickle
 colormap = [(255, 0, 0), (0, 255, 0), (0, 0, 255)]
 
 
-for path in glob.glob("../../dataset6/*.png"):
+for path in glob.glob("../eval/*.png"):
     print(path)
     img = cv2.imread(path)
     cv2.imshow("image", img)   
@@ -44,7 +40,7 @@ for path in glob.glob("../../dataset6/*.png"):
                 box = boxes[0][index]
                 classID = int(classes[0][index])
                 pointA, pointB = (int(box[1]*width), int(box[0]*height)), (int(box[3]*width), int(box[2]*height))
-                cv2.rectangle(frame, pointA, pointB, colormap[classID-1], 4)
+                cv2.rectangle(frame, pointA, pointB, (0,0,0), 8)
 
         cv2.imshow("frame", frame)
 
